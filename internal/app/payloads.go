@@ -38,8 +38,10 @@ func (c TableConfig) StackBB() int {
 // Lessons (worked examples) — and an explicit return target is simpler than
 // a navigation stack for a graph this shallow (docs/design-tui.md §1.2).
 type ReviewRequest struct {
-	// TODO(wire-review): carry the engine.HandRecord + coach annotations
-	// once internal/review lands; until then the request only routes.
+	// The request only routes: the review replays the cached table
+	// session's last completed hand (App.newScreen -> lastHandArchive).
+	// TODO(wire-coach): the table's frozen GradedDecisions ride along in
+	// the archive once internal/coach lands.
 	ReturnTo Screen
 }
 
