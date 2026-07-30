@@ -119,8 +119,9 @@ func (b *ActionBar) OpenSizing(t engine.ActionType) (submit engine.Chips, skippe
 	b.mode = t
 	b.opt = opt
 	b.typed = ""
-	// Start on the half-pot preset: the most common size, and a teaching
-	// anchor — the player sees the "1/2" preset lit up as where they are.
+	// Start on preset 2: postflop that is half pot, the most common size;
+	// opening preflop it is 2.5bb, the standard open the coach teaches. In
+	// both cases a teaching anchor — the player sees where they are.
 	b.amount = b.presetAmounts()[1]
 	return 0, false
 }
@@ -158,9 +159,10 @@ func (b *ActionBar) Cancel() {
 	}
 }
 
-// Preset applies sizing preset i (0-based: 1/3, 1/2, 2/3, pot, all-in).
-// While an amount is being typed, the digit keys 1-5 belong to the typed
-// number instead — see TypeDigit.
+// Preset applies sizing preset i (0-based: 1/3, 1/2, 2/3, pot, all-in
+// postflop; 2bb, 2.5bb, 3bb, 4bb, all-in opening preflop). While an amount
+// is being typed, the digit keys 1-5 belong to the typed number instead —
+// see TypeDigit.
 func (b *ActionBar) Preset(i int) {
 	if b.state != ActionBarSizing || i < 0 || i > 4 {
 		return
@@ -239,12 +241,48 @@ func (b *ActionBar) ConfirmAmount() engine.Chips { return b.clamp(b.value()) }
 // SizingType returns which action is being sized (ActionBet or ActionRaise).
 func (b *ActionBar) SizingType() engine.ActionType { return b.mode }
 
-// presetAmounts computes the five preset values, engine-clamped. Fractions
-// are of the pot *after the hero's call* (base = committed + toCall matches
-// the current bet first), because that is the pot the fraction is "of" —
-// translating "half pot" into chips is precisely the arithmetic a beginner
-// needs to internalize, so the labels show these resolved numbers.
+// openingPreflop reports whether the raise being sized is a preflop open:
+// the bet the hero is raising over (committed + toCall, the current bet
+// level) is exactly one big blind — the blind itself, whether first-in,
+// behind limpers, or checking the BB's option. Preflop sizing is spoken in
+// big blinds ("open to 2.5x"), not pot fractions, so this spot gets the
+// bb ladder (docs/ui-review.md F5).
+//
+// The bar is not told the street, so one postflop shape shares this
+// signature: raising over a minimum bet of exactly one bb. The bb labels
+// remain truthful there ("3bb 30" IS the raise-to amount), so the
+// coincidence misleads nobody. Distinguishing a preflop open from a raise
+// over a larger bet (a 3-bet spot vs a postflop raise) is NOT derivable
+// from Arm's inputs — that refinement needs the street passed in.
+func (b *ActionBar) openingPreflop() bool {
+	return b.mode == engine.ActionRaise && b.bigBlind > 0 &&
+		b.committed+b.toCall == b.bigBlind
+}
+
+// presetAmounts computes the five preset values, engine-clamped.
+//
+// Opening preflop, the presets are the standard big-blind ladder — 2bb,
+// 2.5bb, 3bb, 4bb — because that is the vocabulary every chart and lesson
+// in this app uses for preflop raises, and it puts the coach's standard
+// 2.5bb open one keypress away (F5). Larger sizes (3.5bb opens, +1bb per
+// limper) are one 1bb nudge from a rung.
+//
+// Postflop, fractions are of the pot *after the hero's call* (base =
+// committed + toCall matches the current bet first), because that is the
+// pot the fraction is "of" — translating "half pot" into chips is precisely
+// the arithmetic a beginner needs to internalize, so the labels show these
+// resolved numbers.
 func (b *ActionBar) presetAmounts() [5]engine.Chips {
+	if b.openingPreflop() {
+		bb := b.bigBlind
+		return [5]engine.Chips{
+			b.clamp(2 * bb),
+			b.clamp(5 * bb / 2),
+			b.clamp(3 * bb),
+			b.clamp(4 * bb),
+			b.opt.Max,
+		}
+	}
 	potAfterCall := b.pot + b.toCall
 	base := b.committed + b.toCall
 	frac := func(num, den engine.Chips) engine.Chips {
@@ -352,11 +390,16 @@ func (b *ActionBar) sizingRow(width int) string {
 
 // presetRow renders the numbered presets with their resolved chip amounts —
 // "2 1/2 93", never just "half pot" (§4.3). Translating fractions into
-// chips is exactly the arithmetic a beginner needs to see done.
+// chips is exactly the arithmetic a beginner needs to see done. Opening
+// preflop, the same translation is bb-to-chips ("2 2.5bb 25"): the labels
+// themselves are how the player sees which vocabulary this street speaks.
 func (b *ActionBar) presetRow() string {
 	th := theme.Current
 	amts := b.presetAmounts()
 	names := [5]string{"1/3", "1/2", "2/3", "pot", "all-in"}
+	if b.openingPreflop() {
+		names = [5]string{"2bb", "2.5bb", "3bb", "4bb", "all-in"}
+	}
 	var sb strings.Builder
 	sb.WriteString("  ")
 	for i, name := range names {
