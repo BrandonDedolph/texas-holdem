@@ -20,6 +20,10 @@ func profAtLevel(kind QuizKind, level int) *profile.Profile {
 	return p
 }
 
+// trimFloat renders a float without trailing zeros ("7.5", "9") — the
+// tests' input formatter for numeric answers.
+func trimFloat(f float64) string { return strconv.FormatFloat(f, 'f', -1, 64) }
+
 // correctInput is the input string that answers an item correctly. For spot
 // items the ChoiceAnswer's Correct index is the coach's own pick, which
 // grades Best.

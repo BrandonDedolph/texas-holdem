@@ -29,8 +29,9 @@ type Hindsight struct {
 	// compute against (unknown cards, no live opponents).
 	TrueEquity float64
 	HasEquity  bool
-	// Note is a short factual hindsight sentence ("the price (25%) was right
-	// against the real hand"). Facts about the truth, never a re-grade.
+	// Note is a short factual hindsight clause, phrased to follow the UI's
+	// "your true equity was N%" ("clear of the 25% needed"). Facts about
+	// the truth, never a re-grade.
 	Note string
 }
 
@@ -85,21 +86,23 @@ func trueEquity(hero [2]engine.Card, villains map[engine.Seat][2]engine.Card, bo
 }
 
 // hindsightNote states one fact about the truth of the spot. Facing a bet it
-// compares the price actually paid against the true equity — reconstruction
+// compares the price actually faced against the true equity — reconstruction
 // arithmetic from the event log, not a grade; unpressured spots just say
-// which side of the field the hero was on.
+// which side of the field the hero was on. Deliberately terse: the clause
+// follows "your true equity was N%" on the review's Now row and must fit
+// beside it at the 60-column compact width (docs/ui-review.md F8).
 func hindsightNote(d DecisionFrame, trueEq float64) string {
 	if d.ToCall > 0 {
 		req := int(equity.PotOdds(d.ToCall, d.PotBefore)*100 + 0.5)
 		if trueEq*100+0.5 >= float64(req) {
-			return fmt.Sprintf("the price (%d%%) was right against the real hand", req)
+			return fmt.Sprintf("clear of the %d%% the call needed", req)
 		}
-		return fmt.Sprintf("against the real hand the price (%d%%) was not there", req)
+		return fmt.Sprintf("short of the %d%% the call needed", req)
 	}
 	if trueEq >= 0.5 {
-		return "you were ahead of the field here"
+		return "ahead of the field here"
 	}
-	return "you were behind the field here"
+	return "behind the field here"
 }
 
 // GoodBand reports whether a frozen band names a good decision. The review

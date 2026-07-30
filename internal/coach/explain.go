@@ -151,15 +151,16 @@ var templates = []template{
 			if cf.Draw == ai.NoDraw || of.Report.Discounted <= 0 {
 				return ""
 			}
-			n := outsStr(of.Report.Discounted)
+			n := OutsText(of.Report.Discounted)
 			// The rule of 4 prices a flop draw over two cards; the rule
 			// of 2 prices a turn draw over one. River draws don't exist,
 			// and the strategy never emits an OutsFact there.
-			rule, pct := "4", of.Report.RuleOf4
+			rule, pct := 4, of.Report.RuleOf4
 			if v.Street == engine.Turn {
-				rule, pct = "2", of.Report.RuleOf2
+				rule, pct = 2, of.Report.RuleOf2
 			}
-			shortcut := " — rule of " + rule + ": " + n + "×" + rule + " ≈ " + roundPct(pct) + "."
+			shortcut := " — rule of " + strconv.Itoa(rule) + ": " +
+				RuleShortcut(of.Report.Discounted, rule, pct) + "."
 
 			// The named draw gets its own textbook count, not the total.
 			// Discounted folds in pair outs and half-credits tainted ones, so
@@ -273,7 +274,7 @@ func chipsFor(r ai.Rationale) []NumberChip {
 	}
 	if f, ok := r.Get(ai.FactOuts); ok {
 		if rep := f.(ai.OutsFact).Report; rep.Discounted > 0 {
-			chips = append(chips, NumberChip{"Outs", outsStr(rep.Discounted)})
+			chips = append(chips, NumberChip{"Outs", OutsText(rep.Discounted)})
 		}
 	}
 	return chips
@@ -322,21 +323,49 @@ func holeCombo(hole [2]engine.Card) string {
 	}
 }
 
+// --- Teaching-arithmetic notation ---------------------------------------
+//
+// One spelling for the app's teaching arithmetic, everywhere it appears
+// (docs/ui-review.md F9): the coach's prose, the trainer's answer screens,
+// and any future surface render the same numbers through these helpers, so
+// the notation cannot drift apart again. The policy:
+//
+//	multiplication   ×, no surrounding spaces        "9×4"
+//	approximation    ≈, spaced                       "≈ 36%"
+//	percentages      whole points for estimates      "36%", never "36.0%"
+//	out counts       decimals only when earned       "8", "8.5" (OutsText)
+//	prices           ratio, then the percent         "2.2:1 (31%)" (equity.PotOddsText)
+//
+// The one sanctioned exception: the trainer's "Exact: 31.9%" line keeps a
+// decimal on purpose — that drill is the gap between the estimate and the
+// truth. The trainer's TestNotationPolicy holds coach and trainer output
+// to the byte-identical spelling for the same arithmetic.
+//
+// These belong beside OddsToOne and PotOddsText in internal/equity, but
+// live here until that package can absorb them; the trainer reaches them
+// through this package either way.
+
+// OutsText renders a discounted out count: "8", or "8.5" when tainted outs
+// contribute a half.
+func OutsText(discounted float64) string {
+	return strconv.FormatFloat(discounted, 'f', -1, 64)
+}
+
+// PctText renders an already-scaled percentage (equity.OutsReport.RuleOf4
+// is "per hundred") rounded to whole points: "36%".
+func PctText(scaled float64) string { return strconv.Itoa(int(scaled+0.5)) + "%" }
+
+// RuleShortcut renders the rule-of-2/4 mental arithmetic in the canonical
+// spelling: "9×4 ≈ 36%". pct is the pre-scaled estimate the report already
+// carries (RuleOf4 on the flop, RuleOf2 on the turn).
+func RuleShortcut(outs float64, rule int, pct float64) string {
+	return OutsText(outs) + "×" + strconv.Itoa(rule) + " ≈ " + PctText(pct)
+}
+
 // pctStr renders a 0..1 fraction as a whole percentage: "31%". Whole
 // points only — the coach quotes "~31%", and false precision would teach
 // the wrong lesson about how exactly these numbers can be known.
-func pctStr(x float64) string { return strconv.Itoa(pctRound(x)) + "%" }
-
-func pctRound(x float64) int { return int(x*100 + 0.5) }
-
-// roundPct rounds an already-scaled percentage (RuleOf4 is "per hundred").
-func roundPct(x float64) string { return strconv.Itoa(int(x+0.5)) + "%" }
-
-// outsStr renders a discounted out count: "8", or "8.5" when tainted outs
-// contribute a half.
-func outsStr(discounted float64) string {
-	return strconv.FormatFloat(discounted, 'f', -1, 64)
-}
+func pctStr(x float64) string { return PctText(x * 100) }
 
 func hasAll(r ai.Rationale, kinds []ai.FactKind) bool {
 	for _, k := range kinds {

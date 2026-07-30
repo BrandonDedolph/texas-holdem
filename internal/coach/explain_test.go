@@ -245,9 +245,9 @@ func addFactTokens(set map[string]bool, f ai.Fact) {
 		addTokens(set,
 			strconv.Itoa(f.Report.Count),
 			strconv.Itoa(len(f.Report.Tainted)),
-			outsStr(f.Report.Discounted),
-			roundPct(f.Report.RuleOf4),
-			roundPct(f.Report.RuleOf2),
+			OutsText(f.Report.Discounted),
+			PctText(f.Report.RuleOf4),
+			PctText(f.Report.RuleOf2),
 			"4", "2", // the rule-of-4-and-2 multipliers themselves
 		)
 	case ai.SizingFact:

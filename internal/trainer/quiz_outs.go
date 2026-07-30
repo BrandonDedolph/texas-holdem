@@ -3,9 +3,9 @@ package trainer
 import (
 	"fmt"
 	"math/rand/v2"
-	"strconv"
 	"strings"
 
+	"github.com/BrandonDedolph/texas-holdem/internal/coach"
 	"github.com/BrandonDedolph/texas-holdem/internal/engine"
 	"github.com/BrandonDedolph/texas-holdem/internal/equity"
 	"github.com/BrandonDedolph/texas-holdem/internal/eval"
@@ -239,7 +239,7 @@ func genOutsTainted(rng *rand.Rand) (Item, bool) {
 	if report.Count < 4 || len(report.Tainted) == 0 {
 		return Item{}, false
 	}
-	prompt := "Villain's range: " + spec + ". Count only your CLEAN outs."
+	prompt := "Villain's range: " + spec + ". Count only your clean outs."
 	return outsItem(tagOutsTainted, hero, board, report, prompt,
 		spec, true), true
 }
@@ -279,17 +279,28 @@ func outsExplain(report equity.OutsReport, boardLen int) string {
 		fmt.Sprintf("Clean outs (%d): %s.", report.Count, engine.CardsString(report.Clean)),
 	}
 	if len(report.Tainted) > 0 {
-		lines = append(lines, fmt.Sprintf("Tainted (count half): %s - improve villain too.",
+		lines = append(lines, fmt.Sprintf("Tainted (count half): %s — improve villain too.",
 			engine.CardsString(report.Tainted)))
 	}
 	if boardLen == 3 {
-		lines = append(lines, fmt.Sprintf("Rule of 4: %s outs x 4 ~ %.0f%% by the river.",
-			trimFloat(report.Discounted), report.RuleOf4))
+		lines = append(lines, ruleLine(report, boardLen)+" by the river.")
 	} else {
-		lines = append(lines, fmt.Sprintf("Rule of 2: %s outs x 2 ~ %.0f%% on the river.",
-			trimFloat(report.Discounted), report.RuleOf2))
+		lines = append(lines, ruleLine(report, boardLen)+" on the river.")
 	}
 	return strings.Join(lines, "\n")
+}
+
+// ruleLine spells the rule-of-2/4 arithmetic exactly the way the coach
+// does. The notation — ×, ≈, whole-point percentages — has one home,
+// coach.RuleShortcut, so the trainer and the live coach can never show the
+// same arithmetic in two spellings again (docs/ui-review.md F9).
+func ruleLine(report equity.OutsReport, boardLen int) string {
+	if boardLen == 3 {
+		return "Rule of 4: " + coach.OutsText(report.Discounted) + " outs → " +
+			coach.RuleShortcut(report.Discounted, 4, report.RuleOf4)
+	}
+	return "Rule of 2: " + coach.OutsText(report.Discounted) + " outs → " +
+		coach.RuleShortcut(report.Discounted, 2, report.RuleOf2)
 }
 
 // singleRange is the one-combo range of an exactly known villain holding.
@@ -339,6 +350,3 @@ func claimAll(used *engine.CardSet, s drawShape) bool {
 	}
 	return true
 }
-
-// trimFloat renders a float without trailing zeros ("7.5", "9").
-func trimFloat(f float64) string { return strconv.FormatFloat(f, 'f', -1, 64) }

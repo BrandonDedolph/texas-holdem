@@ -298,7 +298,7 @@ func actionLabel(a engine.Action) string {
 func spotExplain(adv coach.Advice) string {
 	s := "Coach: " + adv.Headline
 	if adv.Body != "" {
-		s += " - " + adv.Body
+		s += " — " + adv.Body
 	}
 	if len(adv.Numbers) > 0 {
 		parts := make([]string, len(adv.Numbers))
