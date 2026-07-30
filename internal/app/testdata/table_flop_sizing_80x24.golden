@@ -1,18 +1,18 @@
  Hand #1 · 6-max NLHE · blinds 5/10 · FLOP                         BTN · ? help
-
-       Nia ᴮᴮ 990               Cole ᵁᵀᴳ 1,000           Ivy ᴴᴶ 1,000
-     ▓▓ ▓▓                    · ·                      · ·
-     checks                   folds                    folds
-
-   Tara ˢᴮ 990              ╭──╮ ╭──╮ ╭──╮                   Sam ᶜᴼ 1,000
- ▓▓ ▓▓                      │8♥│ │J♣│ │T♠│  ·    ·         · ·
- checks                     ╰──╯ ╰──╯ ╰──╯                 folds
-                                     POT 30
-
-                            ╭──╮ ╭──╮
-   ► YOU ᴮᵀᴺ Ⓓ 990          │7♥│ │7♣│        pair of sevens
-                            ╰──╯ ╰──╯
-   calls 10  ? Inaccuracy · Raise to 25 was the play (-0.7bb)
+ ╭──────────────────────────┤  ✗ Cole ᵁᵀᴳ · loose  ├──────────────────────────╮
+ │                               1,000 ✗ folded                               │
+ │                                   POT 30                                   │
+ ├ 2 Nia ᴮᴮ · solid ──╮                                  ╭─ ✗ Ivy ᴴᴶ · sticky ┤
+ │ 990                │                                  │ ✗ folded     1,000 │
+ ├────────────────────╯                                  ╰────────────────────┤
+ │                           8♥   J♣   T♠   ·    ·                            │
+ ├ 1 Tara ˢᴮ · tight ─╮                                  ╭─── ✗ Sam ᶜᴼ · wild ┤
+ │ 990                │                                  │ ✗ folded     1,000 │
+ ├────────────────────╯            ╭──╮ ╭──╮             ╰────────────────────┤
+ │              pair of sevens ─   │7♥│ │7♣│  ─ pair of sevens with a gutsho… │
+ │ calls 10  ? Inaccuracy · Rai…   ╰──╯ ╰──╯                                  │
+ ╰─────────────────────────┤   6 ► YOU ᴮᵀᴺ Ⓓ  990   ├─────────────────────────╯
+ order  1 Tara · 2 Nia · ✗ Cole · ✗ Ivy · ✗ Sam · ► 6 YOU
 ────────────────────────────────────────────────────────────────────────────────
  COACH  Check
         Your hand: Pair of Sevens with Jack, Ten, and Eight kickers. You have

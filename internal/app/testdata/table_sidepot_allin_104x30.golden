@@ -1,18 +1,19 @@
  Hand #1 · 6-max NLHE · blinds 5/10 · PREFLOP                BTN · ? help   ╭──────────────────────────╮
-                                                                            │ COACH                    │
-       Nia ᴮᴮ ALL-IN         Cole ᵁᵀᴳ 1,000        Ivy ᴴᴶ 1,000             │                          │
-     ▓▓ ▓▓  ● 700          · ·                   · ·                        │ Fold                     │
-     all-in 700            folds                 folds                      │                          │
-                                                                            │ 77 is not in the 4-bet   │
-   Tara ˢᴮ ALL-IN                                      Sam ᶜᴼ 1,000         │ chart — folding here     │
- ▓▓ ▓▓  ● 300             ·    ·    ·    ·    ·      · ·                    │ costs nothing. The price │
- all-in 300                                          folds                  │ is 1.7:1 — risk 640 to   │
-       MAIN 180   ·   SIDE 480 (Tara · Nia)   ·   SIDE 2 400 (Nia)          │ win 1,060 → need 38%.    │
-                                                                            │ From the Button you act  │
-                         ╭──╮ ╭──╮                                          │ last — position is       │
-   ► YOU ᴮᵀᴺ Ⓓ 1,940 ● 60│7♥│ │7♣│        pair of sevens                    │ money.                   │
-                         ╰──╯ ╰──╯                                          │                          │
-   raises to 60  ✔ Good                                                     │ Pot odds 1.7:1 (38%)     │
+ ╭───────────────────────┤  ✗ Cole ᵁᵀᴳ · loose  ├───────────────────────╮   │ COACH                    │
+ │                            1,000 ✗ folded                            │   │                          │
+ │     MAIN 180   ·   SIDE 480 (Tara · Nia)   ·   SIDE 2 400 (Nia)      │   │ Fold                     │
+ ├ 6 Nia ᴮᴮ · solid ──╮                            ╭─ ✗ Ivy ᴴᴶ · sticky ┤   │                          │
+ │ ALL-IN       ● 700 │                            │ ✗ folded     1,000 │   │ 77 is not in the 4-bet   │
+ ├────────────────────╯                            ╰────────────────────┤   │ chart — folding here     │
+ │                        ·    ·    ·    ·    ·                         │   │ costs nothing. The price │
+ │                                                                      │   │ is 1.7:1 — risk 640 to   │
+ ├ 5 Tara ˢᴮ · tight ─╮                            ╭─── ✗ Sam ᶜᴼ · wild ┤   │ win 1,060 → need 38%.    │
+ │ ALL-IN       ● 300 │                            │ ✗ folded     1,000 │   │ From the Button you act  │
+ ├────────────────────╯         ╭──╮ ╭──╮          ╰────────────────────┤   │ last — position is       │
+ │           pair of sevens ─   │7♥│ │7♣│  ─ flops a set about 1 in 8.… │   │ money.                   │
+ │ raises to 60  ✔ Good         ╰──╯ ╰──╯  call 1 to win 1.7 — need 38% │   │                          │
+ ╰──────────────────────┤  4 ► YOU ᴮᵀᴺ Ⓓ  1,940  ├──────────────────────╯   │ Pot odds 1.7:1 (38%)     │
+ order  ✗ Cole · ✗ Ivy · ✗ Sam · ► 4 YOU ▲ 60 · 5 Tara ALL-IN · 6 Nia ALL…  │                          │
 ──────────────────────────────────────────────────────────────────────────  │                          │
  Cole folds                                                                 │                          │
  Ivy folds                                                                  │                          │
@@ -21,8 +22,7 @@
  Tara all-in 300                                                            │                          │
  Nia all-in 700                                                             │                          │
 ──────────────────────────────────────────────────────────────────────────  │                          │
-  f fold      c call 640                to call 640 · pot odds 1.7:1 (38%)  │                          │
-                                                                            │                          │
+  ▓ f FOLD ▓   ▓ c CALL 640 ▓           to call 640 · pot odds 1.7:1 (38%)  │                          │
                                                                             │                          │
                                                                             │                          │
                                                                             │                          │

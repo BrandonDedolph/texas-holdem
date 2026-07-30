@@ -1,24 +1,24 @@
  Hand #1 · 6-max NLHE · blinds 5/10 · RIVER                        BTN · ? help
-
-       Nia ᴮᴮ 990               Cole ᵁᵀᴳ 1,000           Ivy ᴴᴶ 1,000
-     6♥ 2♥                    · ·                      · ·
-     shows pair of tens       folds                    folds
-
-   Tara ˢᴮ 1,020            ╭──╮ ╭──╮ ╭──╮ ╭──╮ ╭──╮         Sam ᶜᴼ 1,000
- T♣ 6♠                      │8♥│ │J♣│ │T♠│ │T♦│ │4♦│       · ·
- shows three of a ki…       ╰──╯ ╰──╯ ╰──╯ ╰──╯ ╰──╯       folds
-                     POT 30 to Tara (three of a kind, tens)
-
-                            ╭──╮ ╭──╮
-     YOU ᴮᵀᴺ Ⓓ 990          │7♥│ │7♣│        two pair, tens and sevens
-                            ╰──╯ ╰──╯
-   shows two pair, tens and sevens
+ ╭──────────────────────────┤  ✗ Cole ᵁᵀᴳ · loose  ├──────────────────────────╮
+ │                               1,000 ✗ folded                               │
+ │                   POT 30 to Tara (three of a kind, tens)                   │
+ ├ 2 Nia ᴮᴮ · solid ──╮                                  ╭─ ✗ Ivy ᴴᴶ · sticky ┤
+ │ 990                │  6♥ 2♥                           │ ✗ folded     1,000 │
+ ├────────────────────╯                                  ╰────────────────────┤
+ │                           8♥   J♣   T♠   T♦   4♦                           │
+ ├ 1 Tara ˢᴮ · tight ─╮                                  ╭─── ✗ Sam ᶜᴼ · wild ┤
+ │ 1,020              │  T♣ 6♠                           │ ✗ folded     1,000 │
+ ├────────────────────╯            ╭──╮ ╭──╮             ╰────────────────────┤
+ │   two pair, tens and sevens ─   │7♥│ │7♣│  ─ two pair, tens and sevens — … │
+ │ shows two pair, tens and sev…   ╰──╯ ╰──╯                                  │
+ ╰─────────────────────────┤    6 YOU ᴮᵀᴺ Ⓓ  990    ├─────────────────────────╯
+ order  1 Tara · 2 Nia · ✗ Cole · ✗ Ivy · ✗ Sam · 6 YOU
 ────────────────────────────────────────────────────────────────────────────────
  hand over · 3 Best, 1 Inaccuracy (-0.7bb) · v review
  session · hands 1 · decisions 75% good (3/4) · net -10
 
 ────────────────────────────────────────────────────────────────────────────────
-
+  ▓ space DEAL NEXT ▓   ▓ v REVIEW ▓
 
  hand complete · space deals the next · v review
                                                    esc menu · ? help · v review

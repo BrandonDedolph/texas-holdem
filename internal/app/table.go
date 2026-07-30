@@ -127,6 +127,11 @@ type TableScreen struct {
 	hand      *engine.Hand
 	opponents [engine.MaxSeats]Opponent
 
+	// reads are the villains' one-word archetype tells ("tight", "wild"),
+	// engraved on their seat plates. Derived once from the lineup: stable
+	// reads are what make table reads transferable between hands.
+	reads [engine.MaxSeats]string
+
 	bar       *ActionBar
 	coachMode CoachMode
 	speed     Speed
@@ -243,6 +248,15 @@ func newTableScreen(cfg TableConfig, prefs *Prefs, prof *profile.Profile, stacks
 		prof:         prof,
 		sessionStart: time.Now().UTC(),
 		coach:        coach.New(prof, coachSeed),
+	}
+	for i, key := range cfg.Lineup {
+		s := engine.Seat(i + 1)
+		if !s.Valid() {
+			break
+		}
+		if p, ok := ai.Archetype(key); ok {
+			m.reads[s] = p.Read
+		}
 	}
 	if stacks[heroSeat] > 0 {
 		must(eng.Sit(heroSeat, heroName, stacks[heroSeat]))

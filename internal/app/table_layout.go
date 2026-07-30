@@ -1,6 +1,7 @@
 package app
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -13,24 +14,81 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Table layout (docs/design-tui.md §2). Everything in this file is pure
-// rendering over the TableScreen's state. The one structural invariant that
-// everything else hangs off: EVERY region has a fixed row budget and renders
-// blank when empty. Seats keep their three rows when folded, the board keeps
-// five slots before the flop, the coach strip is reserved even when the
-// coach is off — the table never reflows, so the player's eyes learn fixed
-// landmarks.
+// Table layout — Direction E of docs/table-redesign-pitch-2.md on a rounded
+// rectangle. The drawn ring gives every player one stretch of rim in TRUE
+// clockwise seating order: hero embedded in the bottom edge, Tara and Nia up
+// the left rim, Cole across the top, Ivy and Sam down the right — so "who is
+// on my left" is readable off the shape. Each plate carries an engraved gold
+// digit, its action order THIS street (engine.StreetOrder), and the digits
+// re-stamp when the street turns: the preflop→postflop switch (blinds act
+// last, then first) becomes a visible renumbering of the same six fixed
+// plates, taught by the furniture every hand.
+//
+// Geometry note: the owner dropped the hexagon's diagonal corners — ╱ ╲ are
+// not in the box-drawing joining family, so the chamfers read as loose marks
+// rather than edges. The frame here is a rounded rectangle built from the
+// ring glyph vocabulary (╭ ╮ ╰ ╯ ─ │ plus the plate fusion tees), drawn
+// locally because components.HexRing cannot produce a zero-depth corner (its
+// Corner <= 0 means "the default depth", and the clamp floors at 1).
+//
+// The one structural invariant everything hangs off: EVERY region has a
+// fixed row budget and renders blank when empty. The ring keeps its rows
+// when seats fold, the board keeps five slots before the flop, the coach
+// strip is reserved even when the coach is off — the table never reflows,
+// so the player's eyes learn fixed landmarks.
 //
 // Layout is chosen per-View() from width/height, never stored, so a live
 // resize in either direction just works (§2.7).
 
-// Geometry constants for the full (80x24) layout.
+// Plate slot widths, from the Direction E mockups: the top and hero plates
+// inset into the horizontal edges, the four side plates fuse into the
+// vertical rims.
 const (
-	seatSlotW = components.DefaultSeatWidth // 20-col seat blocks (§2.2)
-	boardW    = components.BoardSlots*components.MiniCardWidth +
-		(components.BoardSlots - 1) // five mini cards, one-col gaps
-	heroCardsW = 2*components.MiniCardWidth + 1 // two mini cards, one gap
+	ringMaxWidth = 78 // the drawn table's width cap at 80 cols
+	topPlateW    = 24
+	heroPlateW   = 26
+	sidePlateW   = 22
+
+	heroCardsW   = 2*components.MiniCardWidth + 1                        // two mini cards, one gap
+	boardInlineW = components.BoardSlots*2 + (components.BoardSlots-1)*3 // inline cards, 3-col gaps
+
+	// boardW is the width of five mini-card slots with one-col gaps — the
+	// hand review's board band still draws the mini-card form.
+	boardW = components.BoardSlots*components.MiniCardWidth + (components.BoardSlots - 1)
 )
+
+// ringSpec is the drawn table's geometry at one breakpoint: overall size and
+// the frame rows its organs live on.
+type ringSpec struct {
+	w, h         int
+	upper, lower int // first frame row of the upper/lower side plates
+	statusRow    int // top seat's chips/status row
+	potRow       int // pot tray row
+	boardRow     int // community cards row
+	cardsTop     int // first row of the hero's mini cards
+}
+
+// ringSpecFor sizes the table for the column budget. The full layout draws
+// 13 rows; the wide layout's left column (deep) spends its extra height on
+// one more felt row between the board and the lower plates.
+func ringSpecFor(w int, deep bool) ringSpec {
+	rw := w - 2
+	if rw > ringMaxWidth {
+		rw = ringMaxWidth
+	}
+	if deep {
+		return ringSpec{w: rw, h: 14, upper: 3, lower: 8,
+			statusRow: 1, potRow: 2, boardRow: 6, cardsTop: 10}
+	}
+	return ringSpec{w: rw, h: 13, upper: 3, lower: 7,
+		statusRow: 1, potRow: 2, boardRow: 6, cardsTop: 9}
+}
+
+// plateRow reports whether a frame row belongs to the side plates (which
+// bring their own borders, fused into the rim with tees).
+func (sp ringSpec) plateRow(r int) bool {
+	return (r >= sp.upper && r < sp.upper+3) || (r >= sp.lower && r < sp.lower+3)
+}
 
 // View implements tea.Model.
 func (m *TableScreen) View() string {
@@ -57,12 +115,11 @@ func (m *TableScreen) View() string {
 	return base
 }
 
-// viewFull is the 80x24 target layout: the row budget in §2.1, verbatim.
-// Terminals taller than the budget get blank rows above the status/footer
-// pair, which stays glued to the bottom of the screen.
+// viewFull is the 80x24 target layout. Terminals taller than the budget get
+// blank rows above the status/footer pair, which stays glued to the bottom.
 func (m *TableScreen) viewFull(w, h int) string {
 	coach := renderCoachStrip(m.coachView(), m.coachMode, m.coachNeutral(), w)
-	rows := m.fullRows(w, strings.SplitN(coach, "\n", coachStripRows))
+	rows := m.fullRows(w, strings.SplitN(coach, "\n", coachStripRows), false)
 	rows = padRowsAboveFooter(rows, h, strings.Repeat(" ", w))
 	return cropHeight(strings.Join(rows, "\n"), h)
 }
@@ -71,10 +128,11 @@ func (m *TableScreen) viewFull(w, h int) string {
 // carries the FULL reasoning (never the [e more] clip) plus the session
 // scoreboard, and reclaims — and doubles — the strip rows for the action
 // ticker (§2.6, ui-review §5 q1). The left column is the full layout at the
-// remaining width, so every full-layout invariant carries over unchanged.
+// remaining width with the deepened ring, so every full-layout invariant
+// carries over unchanged.
 func (m *TableScreen) viewWide(w, h int) string {
 	leftW := w - coachPanelWidth - 2
-	rows := m.fullRows(leftW, m.tickerRows(leftW))
+	rows := m.fullRows(leftW, m.tickerRows(leftW), true)
 	rows = padRowsAboveFooter(rows, h, strings.Repeat(" ", leftW))
 	panel := strings.Split(renderCoachPanel(m.coachView(), m.coachMode, m.coachNeutral(), h), "\n")
 
@@ -90,15 +148,14 @@ func (m *TableScreen) viewWide(w, h int) string {
 }
 
 // wideTickerRows is the wide layout's action-log height: double the strip's
-// budget, paid for by the rows the wide breakpoint guarantees (>=28 high;
-// the frame is 27 rows before padding). A fixed constant — the log region
-// never grows with content.
+// budget, paid for by the rows the wide breakpoint guarantees. A fixed
+// constant — the log region never grows with content.
 const wideTickerRows = 6
 
 // tickerRows renders the recent actions where the coach strip would be —
 // the wide layout shows the coach in its side panel instead, and spends the
-// reclaimed rows (plus three of the wide height budget) on a longer log,
-// bottom-aligned so the newest action is always in the same place.
+// reclaimed rows on a longer log, bottom-aligned so the newest action is
+// always in the same place.
 func (m *TableScreen) tickerRows(w int) []string {
 	th := theme.Current
 	rows := make([]string, wideTickerRows)
@@ -111,193 +168,242 @@ func (m *TableScreen) tickerRows(w int) []string {
 
 // fullRows builds the rows of the full layout. coach supplies the reserved
 // rows between the rules — the 3-row strip at 80 cols, the wide layout's
-// 6-row ticker — and every row is exactly w cells. The strip's third row
-// came out of the old blank row between the action bar and the status line —
-// two blank rows sat there while the coach's reasoning clipped mid-thought
-// (ui-review F1). The budget is still a constant per layout (24 rows at 80
-// cols, 27 wide): the coach region has a fixed height per breakpoint, never
-// a content-dependent one.
-func (m *TableScreen) fullRows(w int, coach []string) []string {
-	blank := strings.Repeat(" ", w)
+// 6-row ticker — and every row is exactly w cells. Budgets per breakpoint:
+// 24 rows at 80 cols (header 1, ring 13, order rail 1, rule, coach 3, rule,
+// bar 2, status, footer), 28 wide (ring 14, ticker 6). The coach region has
+// a fixed height per breakpoint, never a content-dependent one (ui-review
+// F1); the strip stays reserved even when silent.
+func (m *TableScreen) fullRows(w int, coach []string, deep bool) []string {
 	rule := theme.Current.Rule.Render(strings.Repeat(theme.G.RuleH, w))
 
-	rows := make([]string, 0, 24)
-	rows = append(rows, m.headerRow(w))      // 1
-	rows = append(rows, blank)               // 2
-	rows = append(rows, m.topSeatRows(w)...) // 3-5
-	rows = append(rows, blank)               // 6
-	rows = append(rows, m.midRows(w)...)     // 7-9
-	rows = append(rows, m.potRow(w))         // 10
-	rows = append(rows, blank)               // 11
-	rows = append(rows, m.heroRows(w)...)    // 12-14
-	rows = append(rows, m.heroLineRow(w))    // 15
-	rows = append(rows, rule)                // 16
-	for i := range coach {                   // 17-…: reserved even when silent
+	rows := make([]string, 0, 28)
+	rows = append(rows, m.headerRow(w))          // 1
+	rows = append(rows, m.tableRows(w, deep)...) // 2..14 (wide: 2..15)
+	rows = append(rows, m.orderRailRow(w))       // 15: the order rail
+	rows = append(rows, rule)
+	for i := range coach { // reserved even when silent
 		rows = append(rows, padStyledTo(coach[i], w))
 	}
-	rows = append(rows, rule)                                      // 20
-	rows = append(rows, strings.SplitN(m.bar.View(w), "\n", 2)...) // 21-22
-	rows = append(rows, m.statusRow(w))                            // 23
-	rows = append(rows, m.footerRow(w))                            // 24
+	rows = append(rows, rule)
+	rows = append(rows, m.barRows(w)...)
+	rows = append(rows, m.statusRow(w))
+	rows = append(rows, m.footerRow(w))
 	return rows
 }
 
-// headerRow: hand number, game, blinds, street on the left; the hero's
-// position and the help hint on the right.
-func (m *TableScreen) headerRow(w int) string {
+// tableRows draws the ring and everything on it: the rounded-rectangle
+// frame with the six seat plates fused into its rim in clockwise seating
+// order, and the felt interior — pot tray, board, the hero's cards with the
+// potential line, the chip-pile price, and the hero's last graded decision.
+// Exactly sp.h rows, each exactly w cells.
+func (m *TableScreen) tableRows(w int, deep bool) []string {
 	th := theme.Current
-	dot := " " + theme.G.Dot + " "
-
-	street := "waiting"
-	pos := ""
-	if m.hand != nil {
-		street = strings.ToUpper(m.hand.Street().String())
-		if m.hand.DealtIn().Has(heroSeat) {
-			pos = m.hand.Position(heroSeat).String() + dot
-		}
-	}
-	left := " " + "Hand #" + strconv.Itoa(m.handNo) + dot + "6-max NLHE" + dot +
-		"blinds " + m.cfg.SmallBlind.String() + "/" + m.cfg.BigBlind.String() + dot + street
-	right := pos + "? help "
-	return rowLR(w, th.Header.Render(clip(left, w-lipgloss.Width(right)-1)), th.Footer.Render(right))
-}
-
-// topSeatRows renders seats 2, 3, 4 (top-left, top-center, top-right).
-// Seat index is clockwise from the hero, matching engine action order, so
-// after the hero acts the action sweeps up the left side, across the top,
-// and down the right — a consistent visual read (§2.2).
-func (m *TableScreen) topSeatRows(w int) []string {
-	cols := []int{5, (w - seatSlotW) / 2, w - 5 - seatSlotW}
-	blocks := []placedBlock{
-		{cols[0], m.seatView(2).Render()},
-		{cols[1], m.seatView(3).Render()},
-		{cols[2], m.seatView(4).Render()},
-	}
-	return bandRows(w, 3, blocks)
-}
-
-// midRows renders mid-left seat 1, the board, and mid-right seat 5.
-func (m *TableScreen) midRows(w int) []string {
-	boardCol := (w - boardW) / 2
-	blocks := []placedBlock{
-		{1, m.seatView(1).Render()},
-		{boardCol, m.boardBlock()},
-		{w - 1 - seatSlotW, m.seatView(5).Render()},
-	}
-	return bandRows(w, 3, blocks)
-}
-
-// heroRows renders the hero band: info line left, hole cards center (always
-// face up, always bottom-center), hand-strength label right of the cards.
-func (m *TableScreen) heroRows(w int) []string {
-	cardCol := (w - boardW) / 2
-	labelCol := cardCol + heroCardsW + 8
-
-	cards := m.heroCardsBlock()
-	lines := strings.Split(cards, "\n")
-	for len(lines) < 3 {
-		lines = append(lines, "")
-	}
-
-	label := theme.Current.SeatAction.Render(clip(m.heroStrength(), w-labelCol-1))
-	rows := make([]string, 3)
-	rows[0] = overlayRow(w, at{cardCol, lines[0]})
-	rows[1] = overlayRow(w, at{0, m.heroInfo(cardCol)}, at{cardCol, lines[1]}, at{labelCol, label})
-	rows[2] = overlayRow(w, at{cardCol, lines[2]})
-	return rows
-}
-
-// heroInfo is the hero's one-line seat header: turn marker, name, position
-// badge, dealer disc, stack, chips in front.
-func (m *TableScreen) heroInfo(width int) string {
 	g := theme.G
-	th := theme.Current
+	sp := ringSpecFor(w, deep)
+	col := (w - sp.w) / 2
+	if col < 0 {
+		col = 0
+	}
+	orders := m.streetOrders()
 
-	marker, markerStyle := strings.Repeat(" ", lipgloss.Width(g.ToAct)), th.SeatName
-	var badge, dealer, stack, bet string
-	stackStyle := th.SeatStack
-	if m.hand != nil && m.hand.DealtIn().Has(heroSeat) {
-		h := m.hand
-		if h.Phase() == engine.PhaseBetting && h.CurrentSeat() == heroSeat {
-			marker, markerStyle = g.ToAct, th.SeatToAct
+	pieces := make([][]at, sp.h)
+	add := func(row, c int, s string) {
+		if s != "" && row >= 0 && row < sp.h {
+			pieces[row] = append(pieces[row], at{col + c, s})
 		}
-		badge = theme.PositionBadge(h.Position(heroSeat))
-		if h.Button() == heroSeat {
-			dealer = g.Dealer
-		}
-		stack = h.Stack(heroSeat).String()
-		if h.AllIn().Has(heroSeat) {
-			stack, stackStyle = "ALL-IN", th.SeatAllIn
-		}
-		if c := h.Committed(heroSeat); c > 0 {
-			bet = g.ChipsInFront + " " + c.String()
-		}
-	} else {
-		stack = m.eng.Stack(heroSeat).String()
 	}
 
-	parts := []strut{
-		{"   ", th.SeatName},
-		{marker, markerStyle},
-		{heroName, th.HeroBadge},
-		{" ", th.SeatName},
-		{badge, th.PosBadge},
+	topCol := (sp.w - topPlateW) / 2
+	heroCol := (sp.w - heroPlateW) / 2
+	rightCol := sp.w - sidePlateW
+
+	// The frame. Top and bottom edges run corner to corner with the inline
+	// plates fused in; the vertical rims carry every row the side plates
+	// don't bring their own borders for.
+	frame := th.RingFrame
+	add(0, 0, frame.Render(g.RingTL+strings.Repeat(g.RingH, topCol-1)))
+	add(0, topCol, m.plateView(3, topPlateW, orders).RenderInline())
+	add(0, topCol+topPlateW,
+		frame.Render(strings.Repeat(g.RingH, sp.w-topCol-topPlateW-1)+g.RingTR))
+	add(sp.h-1, 0, frame.Render(g.RingBL+strings.Repeat(g.RingH, heroCol-1)))
+	add(sp.h-1, heroCol, m.plateView(heroSeat, heroPlateW, orders).RenderInline())
+	add(sp.h-1, heroCol+heroPlateW,
+		frame.Render(strings.Repeat(g.RingH, sp.w-heroCol-heroPlateW-1)+g.RingBR))
+	for r := 1; r < sp.h-1; r++ {
+		if !sp.plateRow(r) {
+			add(r, 0, frame.Render(g.RingV))
+			add(r, sp.w-1, frame.Render(g.RingV))
+		}
 	}
-	if dealer != "" {
-		// The dealer disc glyph carries its own padding (" (D) " parity), so
-		// no separator space follows it.
-		parts = append(parts, strut{dealer, th.DealerBadge}, strut{stack, stackStyle})
-	} else {
-		parts = append(parts, strut{" ", th.SeatName}, strut{stack, stackStyle})
+
+	// The side plates, clockwise from the hero's left hand: Tara and Nia up
+	// the left rim, Ivy and Sam down the right. Left-hand plates keep their
+	// stack on the rim side and chips toward the pot; right-hand mirrored.
+	sidePlates := []struct {
+		seat engine.Seat
+		row  int
+		col  int
+		hand components.PlateHand
+		open components.PlateEdges
+	}{
+		{2, sp.upper, 0, components.PlateLeftHand, components.PlateEdges{Left: true}},
+		{1, sp.lower, 0, components.PlateLeftHand, components.PlateEdges{Left: true}},
+		{4, sp.upper, rightCol, components.PlateRightHand, components.PlateEdges{Right: true}},
+		{5, sp.lower, rightCol, components.PlateRightHand, components.PlateEdges{Right: true}},
 	}
-	if bet != "" {
-		// Single space: the wide layout's narrower left column leaves the
-		// hero line exactly enough room for stack + bet with no slack.
-		parts = append(parts, strut{" ", th.SeatName}, strut{bet, th.SeatBet})
+	for _, p := range sidePlates {
+		lines := strings.Split(m.plateView(p.seat, sidePlateW, orders).Render(p.hand, p.open), "\n")
+		for i, line := range lines {
+			add(p.row+i, p.col, line)
+		}
 	}
-	return strutRow(width, parts...)
+
+	// The top seat's chips/status on the felt beneath its plate, and the
+	// showdown reveals lying on the felt in front of each side plate.
+	add(sp.statusRow, topCol, m.topSeatRow(3, topPlateW, orders))
+	add(sp.upper+1, sidePlateW+2, m.holeReveal(2))
+	add(sp.lower+1, sidePlateW+2, m.holeReveal(1))
+	if s := m.holeReveal(4); s != "" {
+		add(sp.upper+1, rightCol-2-lipgloss.Width(s), s)
+	}
+	if s := m.holeReveal(5); s != "" {
+		add(sp.lower+1, rightCol-2-lipgloss.Width(s), s)
+	}
+
+	// The felt centre: pot tray (chip pile in front of it while a price is
+	// live), then the board as the high-contrast middle of the table.
+	add(sp.potRow, 2, m.potPiece(sp.w-4))
+	add(sp.boardRow, (sp.w-boardInlineW)/2, m.boardPiece())
+
+	// The hero's corner of the felt: hole cards dead centre of the bottom
+	// edge, hand strength on their left, the potential line ("what your
+	// hand can become") on their right, and beneath those the hero's last
+	// graded decision and the chip-pile price of the current one.
+	cardCol := (sp.w - heroCardsW) / 2
+	for i, line := range strings.Split(m.heroCardsBlock(), "\n") {
+		add(sp.cardsTop+i, cardCol, line)
+	}
+	if s := m.heroStrength(); s != "" {
+		piece := th.SeatAction.Render(clip(s, cardCol-8)) + " " + th.Rule.Render(g.RingH)
+		add(sp.cardsTop+1, cardCol-3-lipgloss.Width(piece), piece)
+	}
+	feltRight := cardCol + heroCardsW + 2
+	feltRightW := sp.w - 2 - feltRight
+	if s := m.heroPotential(); s != "" {
+		add(sp.cardsTop+1, feltRight,
+			th.Rule.Render(g.RingH)+" "+th.Body.Render(clip(s, feltRightW-2)))
+	}
+	add(sp.cardsTop+2, 2, m.feltHeroLine(cardCol-5))
+	add(sp.cardsTop+2, feltRight, m.feltPrice(feltRightW))
+
+	rows := make([]string, sp.h)
+	for r := range rows {
+		ps := pieces[r]
+		sort.SliceStable(ps, func(i, j int) bool { return ps[i].col < ps[j].col })
+		rows[r] = overlayRow(w, ps...)
+	}
+	return rows
 }
 
-// heroLineRow is the reserved hero action/grade line (row 15, §5.3): the
-// hero's last decision joined by its frozen grade — "calls 85  ✗ Mistake ·
-// Fold was the play (-1.2bb)". Both persist until the hero's next decision
-// replaces them (or the showdown reveal takes the row): grades are computed
-// forever, so they must not be shown for a second (ui-review F2).
-//
-// The grade suffix is composed at render time from lastGrade and the LIVE
-// coach mode, so cycling verbosity with tab applies immediately and
-// CoachMistakes/CoachOff withhold exactly what they promise to withhold.
-func (m *TableScreen) heroLineRow(w int) string {
-	th := theme.Current
-	action := clip(m.heroLine, w-4)
-	suffix := ""
-	if m.heroGraded && m.lastGrade != nil && m.lastGrade.Feedback(m.coachMode.ProfileKey()) != "" {
-		suffix = gradeSummary(*m.lastGrade)
+// streetOrders maps each dealt-in seat to its action-order digit for THIS
+// street, first to act = "1" (engine.StreetOrder). Folded seats keep their
+// place on the rim — the plate component masks their digit with the fold
+// mark, which is exactly the "a fold vacates a turn, not a position" lesson.
+func (m *TableScreen) streetOrders() map[engine.Seat]string {
+	if m.hand == nil {
+		return nil
 	}
-	if suffix == "" {
-		return padStyledTo("   "+th.SeatAction.Render(action), w)
+	out := make(map[engine.Seat]string)
+	for i, s := range m.hand.StreetOrder() {
+		out[s] = strconv.Itoa(i + 1)
 	}
-	style := th.GradeBad
-	if m.lastGrade.Grade.GoodOrBetter() {
-		style = th.GradeGood
-	}
-	suffix = clip(suffix, w-4-visibleWidth(action)-2)
-	return padStyledTo("   "+th.SeatAction.Render(action)+"  "+style.Render(suffix), w)
+	return out
 }
 
-// potRow renders the pot region: the derived pot layers in the open —
-// MAIN 900 . SIDE 710 (Nia . you) — or, during the showdown payout, the
-// award being paid.
-func (m *TableScreen) potRow(w int) string {
+// plateView maps a seat's engine state onto the seat-plate view model.
+func (m *TableScreen) plateView(s engine.Seat, width int, orders map[engine.Seat]string) components.SeatPlateView {
+	if m.eng.Status(s) == engine.SeatEmpty {
+		return components.SeatPlateView{Width: width}
+	}
+	v := components.SeatPlateView{
+		Name:  m.seatName(s),
+		Read:  m.reads[s],
+		Hero:  s == heroSeat,
+		Width: width,
+	}
+	if m.hand == nil || !m.hand.DealtIn().Has(s) {
+		v.Stack = m.eng.Stack(s)
+		v.Folded = true
+		return v
+	}
+	h := m.hand
+	v.Order = orders[s]
+	v.Position = h.Position(s)
+	v.Stack = h.Stack(s)
+	v.Bet = h.Committed(s)
+	v.Raised = seatAggressed(m.lastAction[s])
+	v.Folded = !h.Live().Has(s)
+	v.AllIn = h.AllIn().Has(s)
+	v.Dealer = h.Button() == s
+	v.ToAct = h.Phase() == engine.PhaseBetting && h.CurrentSeat() == s
+	return v
+}
+
+// seatAggressed reports whether a seat's chips arrived by bet or raise this
+// street, from the action label the event loop recorded — the raise marker
+// flags aggression, not mere money.
+func seatAggressed(label string) bool {
+	return strings.HasPrefix(label, "raises") || strings.HasPrefix(label, "bets")
+}
+
+// topSeatRow is the felt row beneath the top seat's inline plate: stack and
+// chips/status while the hand runs, stack and revealed cards at showdown.
+func (m *TableScreen) topSeatRow(s engine.Seat, width int, orders map[engine.Seat]string) string {
+	if m.revealed[s] && m.hand != nil {
+		if hole, ok := m.hand.HoleCards(s); ok {
+			text := theme.Current.SeatStack.Render(m.hand.Stack(s).String()) + "  " +
+				components.InlineCard(hole[0]) + " " + components.InlineCard(hole[1])
+			return centerStyled(text, width)
+		}
+	}
+	return m.plateView(s, width, orders).RenderStatus(width)
+}
+
+// holeReveal is a side seat's showdown reveal, lying on the felt in front
+// of its plate (two-row plates cannot carry card glyphs themselves).
+func (m *TableScreen) holeReveal(s engine.Seat) string {
+	if !m.revealed[s] || m.hand == nil {
+		return ""
+	}
+	hole, ok := m.hand.HoleCards(s)
+	if !ok {
+		return ""
+	}
+	return components.InlineCard(hole[0]) + " " + components.InlineCard(hole[1])
+}
+
+// potPiece renders the pot tray, centered in exactly width cells: the
+// derived layers in the open (MAIN 180 · SIDE 480 (Tara · Nia)), the award
+// being paid during the showdown, or the single pot — with its chip pile
+// lying in front while the hero faces a price, so the "win 3" side of the
+// ratio is drawn where the money actually sits.
+func (m *TableScreen) potPiece(width int) string {
+	th := theme.Current
 	if m.awardText != "" {
-		text := theme.Current.PotLine.Render(clip(m.awardText, w))
-		pad := (w - lipgloss.Width(text)) / 2
-		if pad < 0 {
-			pad = 0
-		}
-		return padStyledTo(strings.Repeat(" ", pad)+text, w)
+		return centerStyled(th.PotLine.Render(clip(m.awardText, width)), width)
 	}
-	return components.PotLine(m.potViews(), w)
+	views := m.potViews()
+	if len(views) == 0 {
+		return strings.Repeat(" ", width)
+	}
+	if len(views) > 1 {
+		return components.PotLine(views, width)
+	}
+	text := th.PotLine.Render("POT " + views[0].Amount.String())
+	if pp := m.pilePrice(); pp != nil && pp.PotPile > 0 {
+		text = th.SeatBet.Render(strings.Repeat(theme.G.Chip, pp.PotPile)) + " " + text
+	}
+	return centerStyled(text, width)
 }
 
 // potViews maps the engine's derived pots onto the component view model.
@@ -332,29 +438,194 @@ func (m *TableScreen) potViews() []components.PotView {
 	return views
 }
 
-// boardBlock renders the community board: dealt cards fill left to right,
-// undealt slots are dim placeholder pips in the exact box a card would
-// occupy. At showdown, cards that play in the winning five get the gold
-// winner border — board cards included, which is the "best five of seven"
+// pilePrice is the chip-pile price of the current decision (coach.PilePrice
+// — Direction H's organ grafted into E): non-nil exactly while the hero is
+// choosing or sizing against a live bet.
+func (m *TableScreen) pilePrice() *coach.PricePiles {
+	if m.hand == nil || m.bar.State() == ActionBarWaiting {
+		return nil
+	}
+	toCall := m.hand.ToCall(heroSeat)
+	if toCall <= 0 {
+		return nil
+	}
+	pp := coach.PilePrice(toCall, m.hand.PotTotal())
+	return &pp
+}
+
+// feltPrice renders the call side of the price on the felt in front of the
+// hero's cards: the call pile beside the plain-language ratio — "●● call 2
+// to win 3 — need 40%". When the exact pile plus phrase outgrows the slot
+// the pile is dropped before the phrase is clipped: the words carry the
+// exact price, the chips only illustrate it.
+func (m *TableScreen) feltPrice(maxW int) string {
+	pp := m.pilePrice()
+	if pp == nil {
+		return ""
+	}
+	th := theme.Current
+	pile := strings.Repeat(theme.G.Chip, pp.CallPile)
+	if lipgloss.Width(pile)+1+lipgloss.Width(pp.Phrase) <= maxW {
+		return th.SeatBet.Render(pile) + " " + th.Body.Render(pp.Phrase)
+	}
+	return th.Body.Render(clip(pp.Phrase, maxW))
+}
+
+// feltHeroLine is the hero's reserved action/grade line, lying on the felt
+// beside his cards: the last decision joined by its frozen grade — "calls
+// 10  ? Inaccuracy · Raise to 25 was the play". Both persist until the next
+// decision replaces them (or the showdown reveal takes the slot): grades
+// are computed forever, so they must not be shown for a second (ui-review
+// F2). The suffix is composed at render time from lastGrade and the LIVE
+// coach mode, so cycling verbosity applies immediately and CoachMistakes/
+// CoachOff withhold exactly what they promise to withhold.
+func (m *TableScreen) feltHeroLine(maxW int) string {
+	th := theme.Current
+	if m.heroLine == "" || maxW < 2 {
+		return ""
+	}
+	action := clip(m.heroLine, maxW)
+	suffix := ""
+	if m.heroGraded && m.lastGrade != nil && m.lastGrade.Feedback(m.coachMode.ProfileKey()) != "" {
+		suffix = gradeSummary(*m.lastGrade)
+	}
+	room := maxW - visibleWidth(action) - 2
+	if suffix == "" || room < 4 {
+		return th.SeatAction.Render(action)
+	}
+	style := th.GradeBad
+	if m.lastGrade.Grade.GoodOrBetter() {
+		style = th.GradeGood
+	}
+	return th.SeatAction.Render(action) + "  " + style.Render(clip(suffix, room))
+}
+
+// boardPiece renders the community cards as the felt's high-contrast
+// centre: dealt cards inline, undealt slots as dim pips in the same grid.
+// At showdown, cards that play in the winning five get the gold winner
+// treatment — board cards included, which is the "best five of seven"
 // lesson made visible (§3.5).
-func (m *TableScreen) boardBlock() string {
+func (m *TableScreen) boardPiece() string {
+	th := theme.Current
 	var board []engine.Card
 	if m.hand != nil {
-		full := m.hand.Board()
-		if m.boardShown < len(full) {
-			full = full[:m.boardShown]
-		}
-		board = full
-	}
-	slots := make([]string, components.BoardSlots)
-	for i := range slots {
-		if i < len(board) {
-			slots[i] = m.cardCell(board[i])
-		} else {
-			slots[i] = placeholderCell()
+		board = m.hand.Board()
+		if m.boardShown < len(board) {
+			board = board[:m.boardShown]
 		}
 	}
-	return hjoin(slots, " ")
+	parts := make([]string, components.BoardSlots)
+	for i := range parts {
+		switch {
+		case i < len(board) && m.winners.Has(board[i]):
+			c := board[i]
+			parts[i] = th.CardWinner.Render(string(c.Rank().Letter()) + theme.SuitGlyph(c.Suit()))
+		case i < len(board):
+			parts[i] = components.InlineCard(board[i])
+		default:
+			parts[i] = th.BoardPlaceholder.Render(theme.G.Dot) + " "
+		}
+	}
+	return strings.Join(parts, "   ")
+}
+
+// orderRailRow is the rail below the ring: this street's action order in
+// one line — "order  ✗ Cole · 2 Ivy ▲ 30 · ✗ Sam · ► 4 YOU · 5 Tara — so
+// who still acts behind you is spelled out even when the plates are being
+// scanned for something else. Digits match the plates; folded seats keep
+// their place under the fold mark; commitments ride along with the raise
+// marker when they arrived by aggression.
+func (m *TableScreen) orderRailRow(w int) string {
+	if m.hand == nil {
+		return strings.Repeat(" ", w)
+	}
+	th := theme.Current
+	g := theme.G
+	h := m.hand
+
+	parts := []strut{{" order  ", th.Help}}
+	for i, s := range h.StreetOrder() {
+		if i > 0 {
+			parts = append(parts, strut{" " + g.Dot + " ", th.Rule})
+		}
+		if h.Phase() == engine.PhaseBetting && h.CurrentSeat() == s {
+			parts = append(parts, strut{g.ToAct, th.SeatToAct})
+		}
+		name := m.seatName(s)
+		nameStyle := th.SeatName
+		if s == heroSeat {
+			nameStyle = th.HeroBadge
+		}
+		if !h.Live().Has(s) {
+			parts = append(parts,
+				strut{g.FoldMark + " ", th.SeatFolded}, strut{name, th.SeatFolded})
+			continue
+		}
+		parts = append(parts,
+			strut{strconv.Itoa(i+1) + " ", th.RingDigit}, strut{name, nameStyle})
+		switch {
+		case h.AllIn().Has(s):
+			parts = append(parts, strut{" ", nameStyle}, strut{"ALL-IN", th.SeatAllIn})
+		case h.Committed(s) > 0:
+			mark, markStyle := g.Chip, th.SeatBet
+			if seatAggressed(m.lastAction[s]) {
+				mark, markStyle = g.RaiseMark, th.ActionRaise
+			}
+			parts = append(parts, strut{" ", nameStyle}, strut{mark, markStyle},
+				strut{" " + h.Committed(s).String(), th.SeatBet})
+		}
+	}
+	return strutRow(w, parts...)
+}
+
+// barRows is the two-row action region: the hero's action bar in play, and
+// between hands the deal/review buttons in the same slot — the bar's grammar
+// with the session's two verbs.
+func (m *TableScreen) barRows(w int) []string {
+	if m.handDone {
+		th := theme.Current
+		g := theme.G
+		row := "  " + th.ButtonCheck.Render(g.ButtonFill+" space DEAL NEXT "+g.ButtonFill) +
+			"   " + th.ButtonCall.Render(g.ButtonFill+" v REVIEW "+g.ButtonFill)
+		return []string{padStyledTo(row, w), strings.Repeat(" ", w)}
+	}
+	return strings.SplitN(m.bar.View(w), "\n", 2)
+}
+
+// headerRow: hand number, game, blinds, street on the left; the hero's
+// position and the help hint on the right.
+func (m *TableScreen) headerRow(w int) string {
+	th := theme.Current
+	dot := " " + theme.G.Dot + " "
+
+	street := "waiting"
+	pos := ""
+	if m.hand != nil {
+		street = strings.ToUpper(m.hand.Street().String())
+		if m.hand.DealtIn().Has(heroSeat) {
+			pos = m.hand.Position(heroSeat).String() + dot
+		}
+	}
+	left := " " + "Hand #" + strconv.Itoa(m.handNo) + dot + "6-max NLHE" + dot +
+		"blinds " + m.cfg.SmallBlind.String() + "/" + m.cfg.BigBlind.String() + dot + street
+	right := pos + "? help "
+	return rowLR(w, th.Header.Render(clip(left, w-lipgloss.Width(right)-1)), th.Footer.Render(right))
+}
+
+// heroCardsBlock renders the hero's hole cards as mini cards (or the muck
+// pips after a fold — folded hands are gone, not hidden).
+func (m *TableScreen) heroCardsBlock() string {
+	if m.hand == nil {
+		return "\n\n"
+	}
+	hole, ok := m.hand.HoleCards(heroSeat)
+	if !ok {
+		return "\n\n"
+	}
+	if !m.hand.Live().Has(heroSeat) {
+		return "\n" + theme.Current.SeatFolded.Render(theme.G.Mucked) + "\n"
+	}
+	return hjoin([]string{m.cardCell(hole[0]), m.cardCell(hole[1])}, " ")
 }
 
 // cardCell renders one mini card, winner-bordered when it plays in the
@@ -366,7 +637,9 @@ func (m *TableScreen) cardCell(c engine.Card) string {
 	return components.MiniCard(c)
 }
 
-// placeholderCell is an undealt board slot: same box, dim pip.
+// placeholderCell is an undealt board slot in the mini-card form: same box,
+// dim pip. The live table's board is inline now; the hand review still
+// renders the three-row band.
 func placeholderCell() string {
 	blank := strings.Repeat(" ", components.MiniCardWidth)
 	return blank + "\n" + theme.Current.BoardPlaceholder.Render(theme.G.BoardSlot) + "\n" + blank
@@ -390,26 +663,9 @@ func winnerMiniCard(c engine.Card) string {
 	return top + "\n" + mid + "\n" + bottom
 }
 
-// heroCardsBlock renders the hero's hole cards as mini cards (or the muck
-// pips after a fold — folded hands are gone, not hidden).
-func (m *TableScreen) heroCardsBlock() string {
-	if m.hand == nil {
-		return "\n\n"
-	}
-	hole, ok := m.hand.HoleCards(heroSeat)
-	if !ok {
-		return "\n\n"
-	}
-	if !m.hand.Live().Has(heroSeat) {
-		return "\n" + theme.Current.SeatFolded.Render(theme.G.Mucked) + "\n"
-	}
-	return hjoin([]string{m.cardCell(hole[0]), m.cardCell(hole[1])}, " ")
-}
-
-// heroStrength is the hand-strength label right of the hero's cards:
+// heroStrength is the hand-strength label left of the hero's cards:
 // preflop shorthand ("ace-king suited") before the flop, the evaluator's
-// English afterwards. TODO(wire-coach): the coach may refine this wording
-// ("top pair, top kicker").
+// English afterwards.
 func (m *TableScreen) heroStrength() string {
 	if m.hand == nil {
 		return ""
@@ -431,6 +687,30 @@ func (m *TableScreen) heroStrength() string {
 	return preflopLabel(hole)
 }
 
+// heroPotential is the "what your hand can become" line right of the hero's
+// cards (coach.PotentialLine): what the hand flops and how often before the
+// flop, the made hand plus its live draw after. Mid-deal (one or two board
+// cards shown) it keeps the preflop line — the potential of a partial flop
+// is not a concept worth a transient frame.
+func (m *TableScreen) heroPotential() string {
+	if m.hand == nil {
+		return ""
+	}
+	hole, ok := m.hand.HoleCards(heroSeat)
+	if !ok || !m.hand.Live().Has(heroSeat) {
+		return ""
+	}
+	board := m.hand.Board()
+	n := m.boardShown
+	if n > len(board) {
+		n = len(board)
+	}
+	if n < 3 {
+		n = 0
+	}
+	return coach.PotentialLine(hole, board[:n])
+}
+
 // preflopLabel names hole cards the way players say them: "ace-king
 // suited", "pair of nines", "queen-ten offsuit".
 func preflopLabel(hole [2]engine.Card) string {
@@ -448,8 +728,8 @@ func preflopLabel(hole [2]engine.Card) string {
 	return label + " offsuit"
 }
 
-// statusRow is row 23: whose turn / pacing prompts / temp messages, plus
-// the villain-perspective pot odds while sizing.
+// statusRow: whose turn / pacing prompts / temp messages, plus the
+// villain-perspective pot odds while sizing.
 func (m *TableScreen) statusRow(w int) string {
 	th := theme.Current
 	if m.bar.State() == ActionBarSizing {
@@ -466,7 +746,7 @@ func (m *TableScreen) statusRow(w int) string {
 	return padStyledTo(" "+th.StatusLine.Render(clip(m.status, w-2)), w)
 }
 
-// footerRow is row 24, right-aligned. The review slot is reserved with
+// footerRow is the last row, right-aligned. The review slot is reserved with
 // spaces while a hand is live so "esc menu" never shifts column when the
 // hand ends.
 func (m *TableScreen) footerRow(w int) string {
@@ -479,11 +759,12 @@ func (m *TableScreen) footerRow(w int) string {
 	return rowLR(w, "", theme.Current.Footer.Render(text))
 }
 
-// seatView maps a villain seat's engine state onto the component view model.
+// seatView maps a villain seat's engine state onto the compact ledger's
+// view model (the full layout draws plates instead — plateView).
 func (m *TableScreen) seatView(s engine.Seat) components.SeatView {
-	v := components.SeatView{Name: m.seatName(s), Width: seatSlotW}
+	v := components.SeatView{Name: m.seatName(s), Width: components.DefaultSeatWidth}
 	if m.eng.Status(s) == engine.SeatEmpty {
-		return components.SeatView{Width: seatSlotW}
+		return components.SeatView{Width: components.DefaultSeatWidth}
 	}
 	if m.hand == nil || !m.hand.DealtIn().Has(s) {
 		v.Stack = m.eng.Stack(s)
@@ -564,8 +845,8 @@ func (m *TableScreen) coachView() CoachView {
 	// The grade of the hero's most recent action. It persists past the
 	// villains' responses (ui-review F2), but the moment fresh advice is up
 	// the strip belongs to the NEW decision — the old grade stays on the
-	// hero's reserved line instead (heroLineRow) — and between hands the
-	// strip belongs to the whole hand's verdict (coachNeutral). Feedback
+	// hero's reserved felt line instead (feltHeroLine) — and between hands
+	// the strip belongs to the whole hand's verdict (coachNeutral). Feedback
 	// returns "" when the mode withholds it.
 	if g := m.lastGrade; g != nil && m.advice == nil && !m.handDone {
 		if body := g.Feedback(m.coachMode.ProfileKey()); body != "" {
@@ -663,6 +944,9 @@ func (m *TableScreen) handVerdict() string {
 
 // viewCompact renders the one-line-per-seat ledger: not a degraded
 // afterthought — every number stays on screen, which is the whole point.
+// The one Hexagon organ that survives this size is the order digit column:
+// each seat's action order this street, re-stamped when the street turns,
+// with the fold mark holding a folded seat's place.
 func (m *TableScreen) viewCompact(w, h int) string {
 	th := theme.Current
 	dot := " " + theme.G.Dot + " "
@@ -682,18 +966,27 @@ func (m *TableScreen) viewCompact(w, h int) string {
 			m.cfg.SmallBlind.String()+"/"+m.cfg.BigBlind.String()+dot+street),
 		th.PotLine.Render(pot))
 
+	orders := m.streetOrders()
 	rows := []string{header, rule}
 	for _, s := range []engine.Seat{1, 2, 3, 4, 5, heroSeat} {
 		v := m.seatView(s)
-		v.Width = w
-		rows = append(rows, v.RenderCompact())
+		v.Width = w - 3
+		digit, style := " ", th.RingDigit
+		if m.hand != nil && m.hand.DealtIn().Has(s) {
+			if !m.hand.Live().Has(s) {
+				digit, style = theme.G.FoldMark, th.SeatFolded
+			} else if d, ok := orders[s]; ok {
+				digit = d
+			}
+		}
+		rows = append(rows, " "+style.Render(digit)+" "+v.RenderCompact())
 	}
 	rows = append(rows, rule)
 	rows = append(rows, m.compactBoardRow(w))
 	rows = append(rows, rule)
 	rows = append(rows, padStyledTo(renderCoachLine(m.coachView(), m.coachMode, m.coachNeutral(), w), w))
 	rows = append(rows, rule)
-	rows = append(rows, strings.SplitN(m.bar.View(w), "\n", 2)...)
+	rows = append(rows, m.barRows(w)...)
 	rows = append(rows, blank)
 	rows = append(rows, m.statusRow(w))
 	rows = append(rows, m.footerRow(w))
@@ -785,6 +1078,16 @@ func padStyledTo(s string, width int) string {
 	return s
 }
 
+// centerStyled centers a styled piece in exactly width cells.
+func centerStyled(s string, width int) string {
+	gap := width - lipgloss.Width(s)
+	if gap <= 0 {
+		return s
+	}
+	left := gap / 2
+	return strings.Repeat(" ", left) + s + strings.Repeat(" ", gap-left)
+}
+
 // rowLR lays a left and a right styled piece on one row of exactly width
 // cells, right piece right-aligned. When both cannot fit, the right piece
 // is dropped whole: it is always the auxiliary readout, and clipping a
@@ -823,32 +1126,6 @@ func overlayRow(width int, pieces ...at) string {
 		b.WriteString(strings.Repeat(" ", width-cur))
 	}
 	return b.String()
-}
-
-// placedBlock is a multi-row block placed at a column within a band.
-type placedBlock struct {
-	col   int
-	block string
-}
-
-// bandRows renders a band of rows high, overlaying each block's lines at
-// its column. Blocks shorter than the band contribute blank lines.
-func bandRows(width, rows int, blocks []placedBlock) []string {
-	split := make([][]string, len(blocks))
-	for i, b := range blocks {
-		split[i] = strings.Split(b.block, "\n")
-	}
-	out := make([]string, rows)
-	for r := 0; r < rows; r++ {
-		pieces := make([]at, 0, len(blocks))
-		for i, b := range blocks {
-			if r < len(split[i]) {
-				pieces = append(pieces, at{b.col, split[i][r]})
-			}
-		}
-		out[r] = overlayRow(width, pieces...)
-	}
-	return out
 }
 
 // padRowsAboveFooter grows a fixed-budget frame to the terminal height by

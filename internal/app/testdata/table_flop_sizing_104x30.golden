@@ -1,20 +1,21 @@
  Hand #1 · 6-max NLHE · blinds 5/10 · FLOP                   BTN · ? help   ╭──────────────────────────╮
-                                                                            │ COACH                    │
-       Nia ᴮᴮ 990            Cole ᵁᵀᴳ 1,000        Ivy ᴴᴶ 1,000             │                          │
-     ▓▓ ▓▓                 · ·                   · ·                        │ Check                    │
-     checks                folds                 folds                      │                          │
-                                                                            │ Your hand: Pair of       │
-   Tara ˢᴮ 990           ╭──╮ ╭──╮ ╭──╮                Sam ᶜᴼ 1,000         │ Sevens with Jack, Ten,   │
- ▓▓ ▓▓                   │8♥│ │J♣│ │T♠│  ·    ·      · ·                    │ and Eight kickers. You   │
- checks                  ╰──╯ ╰──╯ ╰──╯              folds                  │ have about 52% equity    │
-                                  POT 30                                    │ against his likely       │
-                                                                            │ range. I put him on      │
-                         ╭──╮ ╭──╮                                          │ ≈34% range (limped).     │
-   ► YOU ᴮᵀᴺ Ⓓ 990       │7♥│ │7♣│        pair of sevens                    │ From the Button you act  │
-                         ╰──╯ ╰──╯                                          │ last — position is       │
-   calls 10  ? Inaccuracy · Raise to 25 was the play (-0.7bb)               │ money.                   │
-──────────────────────────────────────────────────────────────────────────  │                          │
- Sam folds                                                                  │ Your equity ~52%         │
+ ╭───────────────────────┤  ✗ Cole ᵁᵀᴳ · loose  ├───────────────────────╮   │ COACH                    │
+ │                            1,000 ✗ folded                            │   │                          │
+ │                                POT 30                                │   │ Check                    │
+ ├ 2 Nia ᴮᴮ · solid ──╮                            ╭─ ✗ Ivy ᴴᴶ · sticky ┤   │                          │
+ │ 990                │                            │ ✗ folded     1,000 │   │ Your hand: Pair of       │
+ ├────────────────────╯                            ╰────────────────────┤   │ Sevens with Jack, Ten,   │
+ │                        8♥   J♣   T♠   ·    ·                         │   │ and Eight kickers. You   │
+ │                                                                      │   │ have about 52% equity    │
+ ├ 1 Tara ˢᴮ · tight ─╮                            ╭─── ✗ Sam ᶜᴼ · wild ┤   │ against his likely       │
+ │ 990                │                            │ ✗ folded     1,000 │   │ range. I put him on      │
+ ├────────────────────╯         ╭──╮ ╭──╮          ╰────────────────────┤   │ ≈34% range (limped).     │
+ │           pair of sevens ─   │7♥│ │7♣│  ─ pair of sevens with a gut… │   │ From the Button you act  │
+ │ calls 10  ? Inaccuracy · …   ╰──╯ ╰──╯                               │   │ last — position is       │
+ ╰──────────────────────┤   6 ► YOU ᴮᵀᴺ Ⓓ  990   ├──────────────────────╯   │ money.                   │
+ order  1 Tara · 2 Nia · ✗ Cole · ✗ Ivy · ✗ Sam · ► 6 YOU                   │                          │
+──────────────────────────────────────────────────────────────────────────  │ Your equity ~52%         │
+ Sam folds                                                                  │                          │
  YOU calls 10                                                               │                          │
  Tara calls 10                                                              │                          │
  Nia checks                                                                 │                          │
@@ -23,7 +24,6 @@
 ──────────────────────────────────────────────────────────────────────────  │                          │
  BET  min 10 ├●──────────────────────────────────────┤ all-in 990           │                          │
   1 1/3 10  2 1/2 15  3 2/3 20  4 pot 30  5 all-in arrows nudge · 0-9 type  │                          │
-                                                                            │                          │
                                                                             │                          │
                                                                             │                          │
  enter bet 15 · esc cancel         Tara calls 15 · gets 3.0:1 (needs 25%)   │                          │

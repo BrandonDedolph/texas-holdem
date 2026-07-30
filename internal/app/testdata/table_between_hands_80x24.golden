@@ -1,24 +1,24 @@
  Hand #1 · 6-max NLHE · blinds 5/10 · PREFLOP                      BTN · ? help
  ╭──────────────────────────┤  ✗ Cole ᵁᵀᴳ · loose  ├──────────────────────────╮
  │                               1,000 ✗ folded                               │
- │                                 ●●● POT 15                                 │
- ├ 6 Nia ᴮᴮ · solid ──╮                                  ╭─ ✗ Ivy ᴴᴶ · sticky ┤
- │ 990           ● 10 │                                  │ ✗ folded     1,000 │
+ │                               POT 25 to YOU                                │
+ ├ ✗ Nia ᴮᴮ · solid ──╮                                  ╭─ ✗ Ivy ᴴᴶ · sticky ┤
+ │ 990       ✗ folded │                                  │ ✗ folded     1,000 │
  ├────────────────────╯                                  ╰────────────────────┤
  │                           ·    ·    ·    ·    ·                            │
- ├ 5 Tara ˢᴮ · tight ─╮                                  ╭─── ✗ Sam ᶜᴼ · wild ┤
- │ 995            ● 5 │                                  │ ✗ folded     1,000 │
+ ├ ✗ Tara ˢᴮ · tight ─╮                                  ╭─── ✗ Sam ᶜᴼ · wild ┤
+ │ 995       ✗ folded │                                  │ ✗ folded     1,000 │
  ├────────────────────╯            ╭──╮ ╭──╮             ╰────────────────────┤
  │              pair of sevens ─   │7♥│ │7♣│  ─ flops a set about 1 in 8.5 —… │
- │                                 ╰──╯ ╰──╯  ●● call 2 to win 3 — need 40%   │
- ╰─────────────────────────┤  4 ► YOU ᴮᵀᴺ Ⓓ  1,000  ├─────────────────────────╯
- order  ✗ Cole · ✗ Ivy · ✗ Sam · ► 4 YOU · 5 Tara ● 5 · 6 Nia ● 10
+ │ raises to 25  ✔ Best            ╰──╯ ╰──╯                                  │
+ ╰─────────────────────────┤   4 YOU ᴮᵀᴺ Ⓓ  1,015   ├─────────────────────────╯
+ order  ✗ Cole · ✗ Ivy · ✗ Sam · 4 YOU ▲ 25 · ✗ Tara · ✗ Nia
 ────────────────────────────────────────────────────────────────────────────────
- COACH  Raise to 25
-        77 is in the BTN open chart. From the Button you act last — position
-        is money.
-────────────────────────────────────────────────────────────────────────────────
-  ▓ f FOLD ▓   ▓ c CALL 10 ▓   ▓ r RAISE… ▓    to call 10 · pot odds 1.5:1 (40%)
+ hand over · 1 Best · v review
+ session · hands 1 · decisions 100% good (1/1) · net +15
 
- your turn · fold, call, or raise
-                                                   esc menu · ? help
+────────────────────────────────────────────────────────────────────────────────
+  ▓ space DEAL NEXT ▓   ▓ v REVIEW ▓
+
+ hand complete · space deals the next · v review
+                                                   esc menu · ? help · v review
