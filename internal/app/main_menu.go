@@ -235,10 +235,10 @@ func (m *MainMenu) handleSelect() tea.Cmd {
 // never shift a column.
 const mainMenuWidth = 46
 
-// renderList draws the six rows plus the detail slot. The detail line sits
-// in a fixed slot below a blank separator so it reads as a caption for the
-// selection, not for whichever row happens to be last (the F3 complaint:
-// "6-max cash game..." directly under "Quit").
+// renderList draws the six rows. The selected row's detail renders on the
+// shell's status row (the chrome rule), not below the list — the old
+// bottom-of-box slot read as a caption for whichever row happened to be
+// last (the F3 complaint: "6-max cash game..." directly under "Quit").
 func (m *MainMenu) renderList(rows []menuRow) string {
 	th := theme.Current
 	var b strings.Builder
@@ -259,11 +259,10 @@ func (m *MainMenu) renderList(rows []menuRow) string {
 			right = th.Help.Render(r.status)
 		}
 		b.WriteString(rowLR(mainMenuWidth, left, right))
-		b.WriteString("\n")
+		if i < len(rows)-1 {
+			b.WriteString("\n")
+		}
 	}
-	b.WriteString(padRow("", mainMenuWidth))
-	b.WriteString("\n")
-	b.WriteString(th.Help.Render(padRow(rows[m.cursor].detail, mainMenuWidth)))
 	return b.String()
 }
 
@@ -275,32 +274,28 @@ func (m *MainMenu) View() string {
 	}
 	th := theme.Current
 
-	title := renderAppTitle()
+	rows := m.rows()
 	subtitle := th.Subtitle.Render("Learn no-limit hold'em one decision at a time")
-	menuBox := th.ContentBox.Padding(0, 2).Width(52).Render(m.renderList(m.rows()))
-	hint := th.Help.Render("up/down move " + theme.G.Dot + " enter select " +
-		theme.G.Dot + " ? help " + theme.G.Dot + " esc quit")
+	content := lipgloss.PlaceHorizontal(mainMenuWidth, lipgloss.Center, subtitle) +
+		"\n\n" + m.renderList(rows)
 
-	width := lipgloss.Width(menuBox)
-	content := lipgloss.PlaceHorizontal(width, lipgloss.Center, title) + "\n" +
-		lipgloss.PlaceHorizontal(width, lipgloss.Center, subtitle) + "\n\n" +
-		menuBox + "\n" +
-		lipgloss.PlaceHorizontal(width, lipgloss.Center, hint)
-
-	return frame(w, h, content)
+	return renderShell(w, h, shell{
+		Title:      "TEXAS HOLD'EM",
+		TitleExtra: renderSuitBanner(),
+		Status:     rows[m.cursor].detail,
+		Footer: "up/down move " + theme.G.Dot + " enter select " +
+			theme.G.Dot + " esc quit",
+	}, content)
 }
 
-// renderAppTitle draws the one-line banner: the game name flanked by the
-// four suits in their deck colors — a tiny, always-visible advertisement of
-// the four-color deck the player will see on the table.
-func renderAppTitle() string {
+// renderSuitBanner draws the four suits in their deck colors — a tiny,
+// always-visible advertisement of the four-color deck the player will see
+// on the table — for the header's title decoration.
+func renderSuitBanner() string {
 	g := theme.G
-	left := theme.SuitStyle(engine.Spades).Render(g.SuitSpade) + " " +
-		theme.SuitStyle(engine.Hearts).Render(g.SuitHeart)
-	right := theme.SuitStyle(engine.Diamonds).Render(g.SuitDiamond) + " " +
+	return " " + theme.Current.Header.Render(g.Dot) + " " +
+		theme.SuitStyle(engine.Spades).Render(g.SuitSpade) + " " +
+		theme.SuitStyle(engine.Hearts).Render(g.SuitHeart) + " " +
+		theme.SuitStyle(engine.Diamonds).Render(g.SuitDiamond) + " " +
 		theme.SuitStyle(engine.Clubs).Render(g.SuitClub)
-	// Header, not Title: Title carries a bottom margin, which would turn
-	// this one-line banner into a two-row block.
-	name := theme.Current.Header.Render("TEXAS HOLD'EM")
-	return left + " " + name + " " + right
 }

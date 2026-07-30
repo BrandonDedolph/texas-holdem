@@ -97,20 +97,15 @@ func (q *QuickReference) handleAction(a KeyAction) (tea.Cmd, bool) {
 	return nil, false
 }
 
-// View implements tea.Model. Fixed vertical budget: one title row, one tab
-// row, the content area, one footer row — the content area is padded and
-// cropped to exactly its budget so switching tabs never moves the chrome.
+// View implements tea.Model, in the shared chrome. The tab bar is the first
+// content row; the panels underneath have different heights, so the
+// shell's top-anchored content region keeps the tab bar's edge fixed as the
+// player flips through them (the euchre QuickReference lesson).
 func (q *QuickReference) View() string {
 	w, h := fallbackSize(q.width, q.height)
 	if q.help.open {
 		return renderHelp("Quick Reference", q.keymap(), w, h)
 	}
-	th := theme.Current
-
-	title := lipgloss.PlaceHorizontal(w, lipgloss.Center, th.Header.Render("Quick Reference"))
-	tabs := lipgloss.PlaceHorizontal(w, lipgloss.Center, q.renderTabBar())
-	footer := lipgloss.PlaceHorizontal(w, lipgloss.Center, th.Help.Render(
-		"left/right tabs "+theme.G.Dot+" 1-4 jump "+theme.G.Dot+" esc back "+theme.G.Dot+" ? help"))
 
 	var panel string
 	switch q.active {
@@ -123,17 +118,39 @@ func (q *QuickReference) View() string {
 	case tabGlossary:
 		panel = q.renderGlossary()
 	}
-	box := th.ContentBox.Padding(0, 1).Render(panel)
+	// The panel block keeps one width across tabs so the horizontal
+	// centering cannot shift the left edge when the player switches.
+	panel = padBlock(panel, quickRefPanelWidth)
+	content := lipgloss.PlaceHorizontal(quickRefPanelWidth, lipgloss.Center, q.renderTabBar()) +
+		"\n\n" + panel
 
-	// Top-anchored, not centered: tabs have different content heights, and
-	// top-anchoring keeps the box's top edge fixed as the player flips
-	// through them (the euchre QuickReference lesson).
-	contentHeight := h - 3
-	content := padHeight(
-		lipgloss.Place(w, contentHeight, lipgloss.Center, lipgloss.Top, box),
-		contentHeight)
+	return renderShell(w, h, shell{
+		Title:  "Quick Reference",
+		Status: q.tabSummary(),
+		Footer: "left/right tabs " + theme.G.Dot + " 1-4 jump " + theme.G.Dot + " esc back",
+	}, content)
+}
 
-	return title + "\n" + tabs + "\n" + content + "\n" + footer
+// quickRefPanelWidth is the fixed width every tab panel is padded to; the
+// widest row across the four tabs stays under it, and it fits the
+// 60-column compact floor.
+const quickRefPanelWidth = 56
+
+// tabSummary is the status-row caption for the active tab: what the sheet
+// is for, in one line.
+func (q *QuickReference) tabSummary() string {
+	switch q.active {
+	case tabRankings:
+		return "Strongest hand first; suits never break ties"
+	case tabPositions:
+		return "Where you sit decides how many act after you"
+	case tabPotOdds:
+		return "Compare the price of a call with your chance to win"
+	case tabGlossary:
+		return "The words every table conversation assumes"
+	default:
+		return ""
+	}
 }
 
 // renderTabBar draws the numbered tabs with the active one highlighted.

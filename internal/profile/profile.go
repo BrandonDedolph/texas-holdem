@@ -64,11 +64,16 @@ type Profile struct {
 	// LastQuiz is the trainer quiz kind last started, so the trainer opens on
 	// what the player is actually practising instead of resetting to the top
 	// every run. Empty means "never started one".
-	LastQuiz      string      `json:"last_quiz"`
+	LastQuiz string `json:"last_quiz"`
+
+	// UnlockAllLessons lifts every lesson's prerequisite gate (Settings ->
+	// "Lesson locks: All open"). Off by default: the lockstep curriculum is
+	// the pedagogy. Completion tracking is unaffected — only the gates lift.
+	UnlockAllLessons bool `json:"unlock_all_lessons"`
+
 	CoachMode     string      `json:"coach_mode"` // CoachFull | CoachMistakes | CoachOff
 	TableDefaults TableConfig `json:"table_defaults"`
 	Display       Display     `json:"display"`
-
 	// store is the Store that loaded this profile, so Save writes back to
 	// the same place. Unexported and JSON-invisible; nil means "resolve the
 	// default user directory on first Save".
@@ -218,10 +223,12 @@ const (
 	// low enough that one lucky guess cannot swing a level unlock.
 	emaAlpha = 0.3
 
-	// unlockEMA and unlockAttempts gate level progression: at least 80%
+	// UnlockEMA and UnlockAttempts gate level progression: at least 80%
 	// rolling accuracy over at least 20 answers at the current level.
-	unlockEMA      = 0.8
-	unlockAttempts = 20
+	// Exported so the trainer's ladder can state the rule it enforces —
+	// a displayed threshold must be the enforced threshold.
+	UnlockEMA      = 0.8
+	UnlockAttempts = 20
 )
 
 // SkillStat is one skill tag's progress at its current difficulty level.
@@ -255,7 +262,7 @@ func (s SkillStat) Record(correct bool) SkillStat {
 // EMA ≥ 80% over ≥ 20 attempts at the current level. Both boundaries are
 // inclusive — exactly 80% over exactly 20 answers unlocks.
 func (s SkillStat) UnlockReady() bool {
-	return s.Attempts >= unlockAttempts && s.EMA >= unlockEMA
+	return s.Attempts >= UnlockAttempts && s.EMA >= UnlockEMA
 }
 
 // RecordDrill records one answer for a skill tag and returns the updated

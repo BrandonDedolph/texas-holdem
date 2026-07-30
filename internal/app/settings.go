@@ -156,6 +156,7 @@ const (
 	settingGlyphs
 	settingCoach
 	settingSpeed
+	settingLocks
 	settingBack
 )
 
@@ -177,6 +178,13 @@ func NewSettings(p *profile.Profile, prefs *Prefs) *Settings {
 		{Label: "Speed", Detail: "Default pacing; adjustable live with +/-",
 			Options: []string{SpeedLearn.String(), SpeedNormal.String(), SpeedFast.String(), SpeedInstant.String()},
 			Sel:     int(prefs.Speed)},
+		// Lesson locks default to the curriculum order (docs/ui-review.md
+		// §5.4): the lockstep is defensible pedagogy, but the app should
+		// never fight the one learner it has — "All open" lifts every
+		// prerequisite gate while completion tracking carries on unchanged.
+		{Label: "Lesson locks", Detail: "Finish prerequisites in order, or lift every lock",
+			Options: []string{"In order", "All open"},
+			Sel:     boolSel(p.UnlockAllLessons)},
 		{Label: "Back", Detail: "Return to the main menu"},
 	}
 	return &Settings{prof: p, prefs: prefs, list: newFormList(rows)}
@@ -269,6 +277,8 @@ func (s *Settings) applyRow(row int) {
 		_ = s.prof.Save()
 	case settingSpeed:
 		s.prefs.Speed = Speed(r.Sel)
+	case settingLocks:
+		s.prof.UnlockAllLessons = r.Sel == 1
 	}
 	s.prefs.ApplyTo(s.prof)
 	// Presentation prefs live on the profile too, so persist them alongside
@@ -283,13 +293,10 @@ func (s *Settings) View() string {
 	if s.help.open {
 		return renderHelp("Settings", s.keymap(), w, h)
 	}
-	th := theme.Current
-
-	title := th.Title.Render("Settings")
-	box := th.ContentBox.Padding(0, 2).Width(56).Render(s.list.Render(50))
-	hint := th.Help.Render("up/down move " + theme.G.Dot + " left/right change " +
-		theme.G.Dot + " esc back")
-
-	content := title + "\n" + box + "\n" + hint
-	return frame(w, h, content)
+	return renderShell(w, h, shell{
+		Title:  "Settings",
+		Status: s.list.Detail(),
+		Footer: "up/down move " + theme.G.Dot + " left/right change " +
+			theme.G.Dot + " esc back",
+	}, "\n"+s.list.Render(formListWidth))
 }

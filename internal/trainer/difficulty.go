@@ -60,6 +60,52 @@ var quizTags = map[QuizKind][MaxLevel][]string{
 	},
 }
 
+// levelBlurbs is what each level of each kind drills, in the player's
+// vocabulary — one short clause per level, derived from the tag table above
+// (docs/ui-review.md §5.6: the ladder shows its mechanism). Kept next to
+// quizTags so a tag change and its description change in the same diff.
+var levelBlurbs = map[QuizKind][MaxLevel]string{
+	QuizRankings: {
+		"different hand categories",
+		"same category, kickers decide",
+		"the board plays: splits and counterfeits",
+	},
+	QuizOuts: {
+		"clean flush and straight draws",
+		"combo draws: flush plus straight",
+		"tainted outs that also help the villain",
+	},
+	QuizEquity: {
+		"rule of 4 on the flop",
+		"rule of 2 on the turn",
+		"equity against a named range",
+	},
+	QuizSpots: {
+		"preflop chart decisions",
+		"flop pot-odds decisions",
+		"turn and river with a read",
+	},
+}
+
+// LevelBlurb describes what one 1-based level of a kind drills, for the
+// trainer's ladder. Out-of-range levels return "".
+func LevelBlurb(kind QuizKind, level int) string {
+	blurbs, ok := levelBlurbs[kind]
+	if !ok || level < 1 || level > MaxLevel {
+		return ""
+	}
+	return blurbs[level-1]
+}
+
+// GateStat is the profile stat gating a kind's next level unlock — the EMA
+// and attempt count the ladder's progress line reports. Safe on nil.
+func GateStat(prof *profile.Profile, kind QuizKind) profile.SkillStat {
+	if prof == nil {
+		return profile.SkillStat{}
+	}
+	return prof.DrillStats[kindTag(kind)]
+}
+
 // kindTag is the gate tag a kind's level progression is recorded under. It
 // is the kind's String() — one vocabulary, so a profile reads sensibly.
 func kindTag(kind QuizKind) string { return kind.String() }

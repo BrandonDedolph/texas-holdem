@@ -72,10 +72,76 @@ func fallbackSize(w, h int) (int, int) {
 	return w, h
 }
 
-// frame wraps screen content in the standard chrome: content centered inside
-// a rounded border that fills the terminal (euchre's screen shape). The
-// result is always exactly h rows tall — the frame is the outermost layout
-// stability guarantee for every shell screen.
+// --- The chrome system --------------------------------------------------------
+//
+// THE CHROME RULE (docs/ui-review.md F7 — decided, do not drift):
+//
+// Every screen is full-bleed and speaks the table's grammar, one shared
+// five-part shape rendered by renderShell:
+//
+//	row 1     header — title on the left, context + "? help" on the right
+//	row 2     full-width horizontal rule
+//	rows 3..  content, fixed budget of exactly h-4 rows, top-anchored
+//	row h-1   status — one line about the current selection or state
+//	row h     footer — the key legend, right-aligned, ending "? help"
+//
+// There are no screen borders. The rounded border (frame, below) is
+// reserved for true overlays — the help sheet, future confirms/popups —
+// where "floating above the screen" is exactly what the border should say.
+// The table and hand review implement the same grammar with richer interior
+// rules; a new screen must either call renderShell or be an overlay.
+//
+// Why: the app used to split into two accidental visual families (bordered
+// floating menus vs. full-bleed working screens) that flipped mid-flow —
+// opening a lesson, starting a drill. One grammar means chrome never moves
+// between screens: the title is always at the top-left, the keys are always
+// at the bottom-right, and the rule under the title is the same rule the
+// table draws.
+
+// shell is one screen's chrome, consumed by renderShell. All fields are
+// plain text unless noted; renderShell owns the styling so screens cannot
+// drift on treatment.
+type shell struct {
+	Title       string // header left, rendered in the Header style
+	TitleExtra  string // optional pre-styled decoration appended to the title
+	HeaderRight string // header right context; "? help" is appended after it
+	Status      string // the status row; blank keeps the row present but empty
+	Footer      string // key legend; " · ? help" is appended, then right-aligned
+}
+
+// renderShell draws one content screen in the shared chrome (see THE CHROME
+// RULE above). The result is always exactly h rows and every row exactly w
+// cells: header, rule, an h-4 row content region (content is centered
+// horizontally, anchored to the top, cropped rather than reflowed), status,
+// footer.
+func renderShell(w, h int, s shell, content string) string {
+	th := theme.Current
+	dot := " " + theme.G.Dot + " "
+
+	right := "? help "
+	if s.HeaderRight != "" {
+		right = s.HeaderRight + dot + "? help "
+	}
+	titleWidth := w - lipgloss.Width(right) - lipgloss.Width(s.TitleExtra) - 1
+	header := rowLR(w,
+		th.Header.Render(clip(" "+s.Title, titleWidth))+s.TitleExtra,
+		th.Footer.Render(right))
+	rule := th.Rule.Render(strings.Repeat(theme.G.RuleH, w))
+
+	budget := h - 4
+	body := padHeight(
+		lipgloss.Place(w, budget, lipgloss.Center, lipgloss.Top, content),
+		budget)
+
+	status := padStyledTo(" "+th.StatusLine.Render(clip(s.Status, w-2)), w)
+	footer := rowLR(w, "", th.Footer.Render(s.Footer+dot+"? help "))
+	return header + "\n" + rule + "\n" + body + "\n" + status + "\n" + footer
+}
+
+// frame wraps content in a rounded border centered in the terminal. Under
+// THE CHROME RULE above this shape is reserved for overlays (the help
+// sheet); screens themselves render through renderShell. The result is
+// always exactly h rows tall.
 func frame(w, h int, content string) string {
 	content = cropHeight(content, h-4)
 	inner := lipgloss.Place(w-4, h-4, lipgloss.Center, lipgloss.Center, content)
@@ -115,6 +181,11 @@ func padHeight(s string, n int) string {
 // It lives here (rather than internal/ui/components) because it is chrome
 // for the shell screens, not part of the table rendering vocabulary — and
 // keeping it in-package lets the screens stay thin.
+
+// formListWidth is the fixed inner width every formList screen renders at:
+// wide enough for the longest label/value pair, narrow enough to fit the
+// 60-column compact floor with margins to spare.
+const formListWidth = 50
 
 // listRow is one row of a formList. A row with Options is a value field;
 // without, it is an action. Disabled rows render dimmed and the cursor
@@ -202,10 +273,19 @@ func (f *formList) cycle(dir int) bool {
 	return true
 }
 
-// Render draws the list at a fixed inner width: every row is padded to
-// exactly width cells and the detail line below the rows is always present
-// (blank when the selected row has none), so selection changes and value
-// cycling can never move an anchor or change the widget's height.
+// Detail is the selected row's one-line description, for the shell's
+// status row (the chrome rule: the status line describes the selection).
+func (f *formList) Detail() string {
+	if r := f.Row(); r != nil {
+		return r.Detail
+	}
+	return ""
+}
+
+// Render draws the rows at a fixed inner width: every row is padded to
+// exactly width cells, so selection changes and value cycling can never
+// move an anchor or change the widget's height. The selected row's Detail
+// is not drawn here — screens surface it on the shell's status row.
 func (f *formList) Render(width int) string {
 	th := theme.Current
 	var b strings.Builder
@@ -235,13 +315,10 @@ func (f *formList) Render(width int) string {
 		default:
 			b.WriteString(th.MenuItem.Render(line))
 		}
-		b.WriteString("\n")
+		if i < len(f.rows)-1 {
+			b.WriteString("\n")
+		}
 	}
-	detail := ""
-	if r := f.Row(); r != nil {
-		detail = r.Detail
-	}
-	b.WriteString(th.Help.Render(padRow(detail, width)))
 	return b.String()
 }
 

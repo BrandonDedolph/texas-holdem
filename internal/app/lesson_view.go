@@ -316,19 +316,12 @@ func spreadDigits(s string) string {
 
 // --- Rendering ----------------------------------------------------------------
 
-// render draws the lesson at exactly h rows: header, rule, a fixed-budget
-// content area, status, footer — the same fixed-region discipline as every
-// other screen, so stepping sections never moves the chrome.
+// render draws the lesson in the shared chrome (render.go, THE CHROME
+// RULE): the section counter rides the header's context slot, the body
+// fills the fixed h-4 content budget, and the status row carries the
+// scroll cue or the script's live status.
 func (v *lessonView) render(w, h int) string {
-	th := theme.Current
 	dot := " " + theme.G.Dot + " "
-
-	right := "section " + strconv.Itoa(v.idx+1) + " of " +
-		strconv.Itoa(len(v.lesson.Sections)) + dot + "? help "
-	left := " Lesson " + strconv.Itoa(v.lesson.Order) + dot + v.lesson.Title
-	header := rowLR(w, th.Header.Render(clip(left, w-lipgloss.Width(right)-1)),
-		th.Footer.Render(right))
-	rule := th.Rule.Render(strings.Repeat(theme.G.RuleH, w))
 
 	budget := h - 4
 	var body []string
@@ -345,11 +338,14 @@ func (v *lessonView) render(w, h int) string {
 	for i := range body {
 		body[i] = padStyledTo(body[i], w)
 	}
-	content := padHeight(strings.Join(body, "\n"), budget)
 
-	status := padStyledTo(" "+th.StatusLine.Render(clip(v.statusText(), w-2)), w)
-	footer := rowLR(w, "", th.Footer.Render(v.footerText()+" "))
-	return header + "\n" + rule + "\n" + content + "\n" + status + "\n" + footer
+	return renderShell(w, h, shell{
+		Title: "Lesson " + strconv.Itoa(v.lesson.Order) + dot + v.lesson.Title,
+		HeaderRight: "section " + strconv.Itoa(v.idx+1) + " of " +
+			strconv.Itoa(len(v.lesson.Sections)),
+		Status: v.statusText(),
+		Footer: v.footerText(),
+	}, strings.Join(body, "\n"))
 }
 
 // statusText picks the live status line: the script's while a hand runs,
@@ -384,7 +380,7 @@ func (v *lessonView) scrollCue() string {
 }
 
 // footerText names the keys of the current state, from the same vocabulary
-// the keymap documents.
+// the keymap documents. The shell appends the "? help" tail.
 func (v *lessonView) footerText() string {
 	dot := " " + theme.G.Dot + " "
 	switch {
@@ -393,20 +389,20 @@ func (v *lessonView) footerText() string {
 	case v.script != nil:
 		switch {
 		case v.script.phase != scriptActing:
-			return "enter continue" + dot + "esc lessons" + dot + "? help"
+			return "enter continue" + dot + "esc lessons"
 		case v.script.bar.State() == ActionBarSizing:
-			return "enter confirm" + dot + "esc cancel" + dot + "? help"
+			return "enter confirm" + dot + "esc cancel"
 		default:
-			return "esc lessons" + dot + "? help"
+			return "esc lessons"
 		}
 	case v.section().Drill != nil:
-		return "enter check" + dot + "left/right sections" + dot + "esc lessons" + dot + "? help"
+		return "enter check" + dot + "left/right sections" + dot + "esc lessons"
 	default:
 		keys := "left/right sections"
 		if v.maxScroll > 0 {
 			keys = "up/down scroll" + dot + keys
 		}
-		return keys + dot + "esc lessons" + dot + "? help"
+		return keys + dot + "esc lessons"
 	}
 }
 
