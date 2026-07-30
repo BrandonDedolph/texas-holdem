@@ -47,21 +47,28 @@ func renderHelp(title string, km KeyMap, w, h int) string {
 	w, h = fallbackSize(w, h)
 	th := theme.Current
 
+	// One line, not two, under the title: the table's choosing-state sheet
+	// is the longest keymap and must fit inside an 80x24 frame whole.
 	var b strings.Builder
-	b.WriteString(th.CoachTitle.Render("Controls") + "\n\n")
+	b.WriteString(th.CoachTitle.Render("Controls") + "\n")
 	if title != "" {
 		b.WriteString(th.Subtitle.Render(title) + "\n")
 	}
 	writeBindings(&b, km)
 	b.WriteString("\n" + th.Subtitle.Render("Everywhere") + "\n")
 	writeBindings(&b, globalKeys)
-	b.WriteString("\n" + th.Help.Render("Press any key to close"))
+	b.WriteString(th.Help.Render("Press any key to close"))
 
-	sheet := th.ContentBox.Render(b.String())
+	// No vertical padding: the table's choosing-state sheet is 18 rows of
+	// text, and the frame leaves exactly 20 inside an 80x24 terminal — the
+	// border must survive whole.
+	sheet := th.ContentBox.Padding(0, 2).Render(b.String())
 	return frame(w, h, sheet)
 }
 
 // writeBindings renders one keymap as aligned "keycap  description" lines.
+// Bindings sharing a label+help render once: key families like the sizing
+// digits are five actions but one legend row.
 func writeBindings(b *strings.Builder, km KeyMap) {
 	labelWidth := 0
 	for _, bind := range km {
@@ -70,7 +77,12 @@ func writeBindings(b *strings.Builder, km KeyMap) {
 		}
 	}
 	th := theme.Current
+	seen := map[string]bool{}
 	for _, bind := range km {
+		if seen[bind.Label+"\x00"+bind.Help] {
+			continue
+		}
+		seen[bind.Label+"\x00"+bind.Help] = true
 		pad := strings.Repeat(" ", labelWidth-lipgloss.Width(bind.Label))
 		b.WriteString("  " + th.ActionKeycap.Render(bind.Label) + pad + "  " +
 			th.Body.Render(bind.Help) + "\n")

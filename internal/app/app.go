@@ -171,12 +171,13 @@ func (a *App) newScreen(screen Screen, data interface{}) tea.Model {
 	case ScreenQuickReference:
 		return NewQuickReference()
 	case ScreenTable:
-		// TODO(wire-table): becomes the Table session model (later wave).
-		cs := newComingSoon(screen)
 		if cfg, ok := data.(TableConfig); ok {
-			cs.detail = tableConfigSummary(cfg)
+			return NewTableScreen(cfg, a.prefs)
 		}
-		return cs
+		// Navigating to the table without a payload and without a cached
+		// session (e.g. a future "resume" shortcut): fall back to the
+		// profile's last-used setup rather than refusing to play.
+		return NewTableScreen(a.defaultTableConfig(), a.prefs)
 	case ScreenHandReview:
 		// TODO(wire-review): becomes HandReview; honor ReviewRequest.ReturnTo.
 		cs := newComingSoon(screen)
@@ -294,9 +295,25 @@ func (c *ComingSoon) View() string {
 	return frame(w, h, b.String())
 }
 
-// tableConfigSummary renders the setup choices a Table placeholder was
+// defaultTableConfig assembles a session config from the profile's
+// last-used table defaults and the live prefs — the same values GameSetup
+// would start from.
+func (a *App) defaultTableConfig() TableConfig {
+	d := a.profile.TableDefaults
+	return TableConfig{
+		SmallBlind: d.SmallBlind,
+		BigBlind:   d.BigBlind,
+		Stack:      d.Stack,
+		Lineup:     append([]string(nil), d.Lineup...),
+		CoachMode:  CoachModeFromProfile(a.profile.CoachMode),
+		Speed:      a.prefs.Speed,
+	}
+}
+
+// tableConfigSummary renders the setup choices a placeholder screen was
 // launched with, so starting a game shows the player their config made it
-// through the pipe intact.
+// through the pipe intact. (Still exercised by ComingSoon's tests; the
+// table itself no longer uses it.)
 func tableConfigSummary(cfg TableConfig) []string {
 	labels := make([]string, 0, len(cfg.Lineup))
 	byKey := map[string]string{}

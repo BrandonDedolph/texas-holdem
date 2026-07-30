@@ -108,8 +108,10 @@ func TestNavigationFreshDataReplacesModel(t *testing.T) {
 
 func TestEndSessionDropsTableAndReview(t *testing.T) {
 	a := newTestApp(t)
+	// SpeedInstant so the real table model settles synchronously — a Learn
+	// session's Init returns a think-time tick that drive() would sleep on.
 	cfg := TableConfig{SmallBlind: 5, BigBlind: 10, Stack: 1000,
-		Lineup: ClassroomLineup()}
+		Lineup: ClassroomLineup(), Speed: SpeedInstant}
 
 	drive(t, a, NavigateMsg{Screen: ScreenTable, Data: cfg})
 	drive(t, a, NavigateMsg{Screen: ScreenHandReview,
