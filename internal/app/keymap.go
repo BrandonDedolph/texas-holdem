@@ -161,6 +161,16 @@ var (
 		backBinding("back to menu"),
 		bindHelp,
 	}
+
+	// The hand-review screen: step between hero decisions with the arrows
+	// (the step past the last decision is the result frame), esc returns to
+	// wherever the review was opened from (ReviewRequest.ReturnTo).
+	handReviewKeys = KeyMap{
+		Binding{ActLeft, []string{"left", "h"}, "left/h", "previous decision"},
+		Binding{ActRight, []string{"right", "l"}, "right/l", "next decision / result"},
+		backBinding("back"),
+		bindHelp,
+	}
 )
 
 // Table-screen keymaps, one per action-bar/pacing state (docs/design-tui.md

@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/BrandonDedolph/texas-holdem/internal/profile"
+	"github.com/BrandonDedolph/texas-holdem/internal/review"
 	"github.com/BrandonDedolph/texas-holdem/internal/ui/theme"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -22,10 +23,9 @@ import (
 // Screen identifies a screen in the application.
 type Screen int
 
-// Screens (docs/design-tui.md §1.1). Table, HandReview, Lessons and Trainer
-// are routed but currently land on placeholders — their models arrive with
-// the packages they depend on. TODO(wire-table) TODO(wire-review)
-// TODO(wire-lessons) TODO(wire-trainer).
+// Screens (docs/design-tui.md §1.1). Lessons and Trainer are routed but
+// currently land on placeholders — their models arrive with the packages
+// they depend on. TODO(wire-lessons) TODO(wire-trainer).
 const (
 	ScreenMainMenu Screen = iota
 	ScreenGameSetup
@@ -179,12 +179,20 @@ func (a *App) newScreen(screen Screen, data interface{}) tea.Model {
 		// profile's last-used setup rather than refusing to play.
 		return NewTableScreen(a.defaultTableConfig(), a.prefs)
 	case ScreenHandReview:
-		// TODO(wire-review): becomes HandReview; honor ReviewRequest.ReturnTo.
-		cs := newComingSoon(screen)
+		// The review replays the cached table session's last completed hand.
+		// No session (or no finished hand yet) gets the screen's honest empty
+		// state rather than a refusal — navigation must always work.
+		returnTo := ScreenMainMenu
 		if req, ok := data.(ReviewRequest); ok {
-			cs.returnTo = req.ReturnTo
+			returnTo = req.ReturnTo
 		}
-		return cs
+		var model *review.ReplayModel
+		if t, ok := a.models[ScreenTable].(*TableScreen); ok {
+			if rec, ann, ok := t.lastHandArchive(); ok {
+				model = review.Replay(rec, ann)
+			}
+		}
+		return NewHandReview(model, returnTo)
 	case ScreenLessons, ScreenTrainer:
 		// TODO(wire-lessons) TODO(wire-trainer): later wave.
 		return newComingSoon(screen)

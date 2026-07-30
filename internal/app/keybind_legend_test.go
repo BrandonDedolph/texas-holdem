@@ -32,6 +32,10 @@ func legendScreens(t *testing.T) []legendScreen {
 		{"Settings", NewSettings(p, prefs)},
 		{"QuickReference", NewQuickReference()},
 		{"ComingSoon", newComingSoon(ScreenLessons)},
+		// The review without a model: the empty state, its most static form.
+		// The populated screen's legend behaviour is probed by the
+		// TestHandReview* tests in hand_review_test.go.
+		{"HandReview", NewHandReview(nil, ScreenMainMenu)},
 		// The table without Init: no hand dealt, waiting state — its most
 		// static keymap. The state-dependent maps are probed by the
 		// TestTable* legend tests below.
@@ -53,6 +57,7 @@ func TestKeymapKeysAreUnique(t *testing.T) {
 		"settingsKeys":      settingsKeys,
 		"quickRefKeys":      quickRefKeys,
 		"comingSoonKeys":    comingSoonKeys,
+		"handReviewKeys":    handReviewKeys,
 		"globalKeys":        globalKeys,
 		"tableWaitingKeys":  tableWaitingKeys,
 		"tablePauseKeys":    tablePauseKeys,
