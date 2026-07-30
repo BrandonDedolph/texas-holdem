@@ -82,7 +82,7 @@ func NewWithProfile(p *profile.Profile) *App {
 		prefs:   PrefsFrom(p),
 	}
 	a.prefs.ApplyTo(p) // push the restored prefs into the theme globals
-	a.models[ScreenMainMenu] = NewMainMenu()
+	a.models[ScreenMainMenu] = NewMainMenu(p)
 	return a
 }
 
@@ -204,7 +204,7 @@ func (a *App) newScreen(screen Screen, data interface{}) tea.Model {
 	case ScreenTrainer:
 		return NewTrainer(a.profile, a.prefs)
 	default:
-		return NewMainMenu()
+		return NewMainMenu(a.profile)
 	}
 }
 

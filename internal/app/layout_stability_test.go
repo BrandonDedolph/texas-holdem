@@ -78,21 +78,30 @@ func sized(t *testing.T, m tea.Model, w, h int) {
 }
 
 func TestMainMenuLayoutStable(t *testing.T) {
+	// A mid-journey profile so the status column is populated: the detail
+	// rows and right-aligned statuses must not make the menu reflow.
+	prof := profile.NewProfile()
+	for _, id := range []string{"hand-rankings", "hand-flow"} {
+		prof.CompleteLesson(id)
+	}
+	prof.SessionLog = append(prof.SessionLog, profile.SessionSummary{Hands: 38})
+	prof.DrillStats["outs"] = profile.SkillStat{EMA: 0.55, Attempts: 12}
+
 	for _, bp := range breakpoints {
-		m := NewMainMenu()
+		m := NewMainMenu(prof)
 		sized(t, m, bp.w, bp.h)
 
 		assertAnchorsStable(t, m.View,
 			[]string{"TEXAS HOLD'EM", "Play", "Quit"},
 			map[string]func(){
-				"cursor to lessons":  func() { m.handleAction(ActDown) },
-				"cursor to quit":     func() { m.list.cursor = 5 },
+				"cursor to lessons":  func() { m.cursor = menuLessons },
+				"cursor to quit":     func() { m.cursor = menuQuit },
 				"wrap back to top":   func() { m.handleAction(ActDown) },
 				"cursor up wraps":    func() { m.handleAction(ActUp) },
-				"back to first row":  func() { m.list.cursor = 0 },
-				"long detail row":    func() { m.list.cursor = 3 }, // longest Detail line
-				"short detail row":   func() { m.list.cursor = 5 },
-				"first row again ok": func() { m.list.cursor = 0 },
+				"back to first row":  func() { m.cursor = menuPlay },
+				"long detail row":    func() { m.cursor = menuQuickRef }, // longest detail line
+				"short detail row":   func() { m.cursor = menuQuit },
+				"first row again ok": func() { m.cursor = menuPlay },
 			})
 	}
 }

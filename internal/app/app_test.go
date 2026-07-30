@@ -324,29 +324,34 @@ func TestFormListAllDisabledDoesNotSpin(t *testing.T) {
 func TestMainMenuRoutes(t *testing.T) {
 	a := newTestApp(t)
 
-	// Select "Play" (first row): must land on GameSetup.
-	drive(t, a, key("enter"))
-	if a.current != ScreenGameSetup {
-		t.Fatalf("Play should open GameSetup, got %v", a.current)
-	}
-
-	// Esc returns to the menu.
-	drive(t, a, key("esc"))
-	if a.current != ScreenMainMenu {
-		t.Fatalf("esc from setup should return to the menu, got %v", a.current)
-	}
-
-	// Lessons opens the real curriculum.
-	drive(t, a, key("down"))
+	// A fresh profile starts the cursor on Lessons — the beginner's door —
+	// so the first enter opens the real curriculum, not the table.
 	drive(t, a, key("enter"))
 	if a.current != ScreenLessons {
-		t.Fatalf("second row should open Lessons, got %v", a.current)
+		t.Fatalf("fresh profile: enter should open Lessons, got %v", a.current)
 	}
 	if view := a.View(); strings.Contains(view, "Coming soon") {
 		t.Error("Lessons still shows a placeholder")
 	}
 	if view := a.View(); !strings.Contains(view, "Hand Rankings") {
 		t.Error("Lessons should list the curriculum")
+	}
+
+	// Esc returns to the menu, cursor where it was.
+	drive(t, a, key("esc"))
+	if a.current != ScreenMainMenu {
+		t.Fatalf("esc from lessons should return to the menu, got %v", a.current)
+	}
+
+	// Up from Lessons is Play: must land on GameSetup.
+	drive(t, a, key("up"))
+	drive(t, a, key("enter"))
+	if a.current != ScreenGameSetup {
+		t.Fatalf("Play should open GameSetup, got %v", a.current)
+	}
+	drive(t, a, key("esc"))
+	if a.current != ScreenMainMenu {
+		t.Fatalf("esc from setup should return to the menu, got %v", a.current)
 	}
 }
 

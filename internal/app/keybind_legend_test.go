@@ -27,7 +27,7 @@ func legendScreens(t *testing.T) []legendScreen {
 	prefs := DefaultPrefs()
 
 	screens := []legendScreen{
-		{"MainMenu", NewMainMenu()},
+		{"MainMenu", NewMainMenu(p)},
 		{"GameSetup", NewGameSetup(p, prefs)},
 		{"Settings", NewSettings(p, prefs)},
 		{"QuickReference", NewQuickReference()},
