@@ -131,8 +131,8 @@ func init() {
 						},
 					},
 					Intro: "Three-handed, blinds 5/10. The classic: 9s 8s picks up the " +
-						"flush draw on As Ks 2h. You'll face a bet on the flop AND the " +
-						"turn — and the right answer changes between them.",
+						"flush draw on an ace-king flop. You'll face a bet on the flop AND " +
+						"the turn — and the right answer changes between them.",
 					Debrief: "One draw, two prices, two different correct answers. Flop: " +
 						"36% equity vs 26% price — call. Turn: 18% vs 26% — fold. Players " +
 						"who learn the first half but not the second pay for everyone " +

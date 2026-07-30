@@ -333,7 +333,7 @@ func (v *lessonView) render(w, h int) string {
 	case v.splash:
 		body = v.renderSplash()
 	case v.script != nil:
-		body = v.renderScript(w, budget)
+		body = v.renderScript(w, budget, compact)
 	case v.section().Drill != nil:
 		body = v.renderDrill(w, compact)
 	default:
@@ -507,18 +507,48 @@ func (v *lessonView) renderDrillInput(d *tutorial.Drill, cw int) []string {
 		}
 		return lines
 	case tutorial.OrderAnswer:
-		lines := make([]string, 0, len(ans.Items)+2)
-		for i, item := range ans.Items {
-			// Items are often card codes ("Ad 10d 8d 6d 3d"); colorize so
-			// the hands being ordered read as cards, not codes.
-			lines = append(lines, " "+tutorial.ColorizeCards(
-				clip("  "+strconv.Itoa(i+1)+". "+item, cw-1), th.Body))
+		lines := make([]string, 0, 3*len(ans.Items)+2)
+		if hands, ok := orderItemsAsCards(ans.Items); ok {
+			// The learner is being asked to RANK these hands, so each option
+			// is drawn as cards — mini cards, so all the options and the input
+			// line share the screen with no scrolling mid-answer.
+			for i, hand := range hands {
+				label := "  " + strconv.Itoa(i+1) + ". "
+				margin := strings.Repeat(" ", lipgloss.Width(label))
+				for j, row := range strings.Split(components.MiniCards(hand...), "\n") {
+					if j == 1 { // middle row carries the option number
+						lines = append(lines, " "+th.Body.Render(label)+row)
+					} else {
+						lines = append(lines, " "+margin+row)
+					}
+				}
+			}
+		} else {
+			for i, item := range ans.Items {
+				lines = append(lines, " "+th.Body.Render(
+					clip("  "+strconv.Itoa(i+1)+". "+item, cw-1)))
+			}
 		}
 		return append(lines, "",
 			" "+th.Body.Render("your order: "+spreadDigits(v.drill.typed))+caret)
 	default: // NumericAnswer
 		return []string{" " + th.Body.Render("your answer: "+v.drill.typed) + caret}
 	}
+}
+
+// orderItemsAsCards parses an OrderAnswer's items as card hands. It reports
+// ok only when EVERY item is a list of two or more cards — mixed or
+// non-card item sets (streets, seat names) keep their text rendering.
+func orderItemsAsCards(items []string) ([][]engine.Card, bool) {
+	hands := make([][]engine.Card, len(items))
+	for i, item := range items {
+		cards, err := engine.ParseCards(item)
+		if err != nil || len(cards) < 2 {
+			return nil, false
+		}
+		hands[i] = cards
+	}
+	return hands, true
 }
 
 // renderSplash is the completion panel: the lesson is recorded and saved by
@@ -973,7 +1003,7 @@ func (v *lessonView) scriptSized(t engine.ActionType, amt engine.Chips) {
 // per seat, the board, the teach/coach box, and the shared action bar. The
 // ledger reuses the table's own seat component so a lesson hand looks like
 // the game it is teaching.
-func (v *lessonView) renderScript(w, budget int) []string {
+func (v *lessonView) renderScript(w, budget int, compact bool) []string {
 	th := theme.Current
 	cw := w - 2
 	r := v.script
@@ -982,6 +1012,16 @@ func (v *lessonView) renderScript(w, budget int) []string {
 		lines := []string{" " + th.Header.Render(clip(sectionTitleOr(v.section(), "Scripted hand"), cw)), ""}
 		for _, l := range wrapBody(r.script.Intro, cw) {
 			lines = append(lines, " "+tutorial.ColorizeCards(l, th.Body))
+		}
+		// The hand the intro is talking about, drawn as cards before the
+		// deal — an intro that names your holding shows your holding.
+		if hole, ok := r.script.Holes[r.script.Hero]; ok {
+			block := components.FullHand(hole, 0)
+			if compact {
+				block = components.MiniCards(hole[0], hole[1])
+			}
+			lines = append(lines, "", " "+th.Body.Render("Your hand"))
+			lines = append(lines, indentBlock(block)...)
 		}
 		return append(lines, "", " "+th.Help.Render("enter deals the hand"))
 	}

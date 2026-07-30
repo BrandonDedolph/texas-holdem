@@ -64,99 +64,10 @@ func (v *Visual) render(width int, compact bool) string {
 	return body
 }
 
-// --- The full-size study card ---------------------------------------------------
-//
-// Two card sizes exist on purpose. The table screen keeps the 5x3 mini card:
-// its seat ring already spends 13 of 24 rows, and 5-row cards would cost
-// roughly four more rows between the board and the hero's hand, which that
-// layout cannot pay. Lessons and the trainer exist to LOOK at cards, have
-// the rows to spare, and so draw this full 7x5 card — rank in the top-left
-// index, suit pip centred, rank mirrored bottom-right, like a real card
-// (the euchre project's card, which the owner asked for). Glanceable on the
-// table, a full card when the card itself is the subject.
-//
-// TODO(promote): this renderer belongs in internal/ui/components next to
-// MiniCard; it lives here for now because this change does not own that
-// package. Two theme gaps worth closing at promotion time: the palette has
-// no card-face background (euchre paints a white card body; we render suit
-// ink on the terminal background), and glyphs.go has no double-border set
-// (euchre's emphasis border; we emphasise with the CardWinner gold ink the
-// table's showdown already uses).
-
-// Full-card geometry: every full card is exactly FullCardWidth cells wide
-// and FullCardHeight rows tall. The interior is five cells, sized for the
-// two-character "10" rank plus breathing room.
-const (
-	FullCardWidth  = 7
-	FullCardHeight = 5
-
-	fullInterior = FullCardWidth - 2
-)
-
-// FullCard renders the 7x5 study card: rank top-left, suit centred, rank
-// mirrored bottom-right, on a white face. highlight swaps the single frame
-// for the double-border emphasis form - "these five play", or the card a
-// drill is pointing at.
-//
-// The face is deliberately white with fixed dark ink rather than adaptive
-// terminal colours. A playing card is a physical white object, and drawing
-// it as one is most of what makes this read as a card instead of glyphs
-// floating in space (design-tui.md section 3.1).
-func FullCard(c engine.Card, highlight bool) string {
-	g := theme.G
-	border := theme.Current.CardBorder
-	tl, tr, bl, br, h, v := g.CardTL, g.CardTR, g.CardBL, g.CardBR, g.CardH, g.CardVL
-	vr := g.CardVR
-	if highlight {
-		border = theme.Current.CardWinner
-		tl, tr, bl, br, h, v = g.CardDblTL, g.CardDblTR, g.CardDblBL, g.CardDblBR, g.CardDblH, g.CardDblV
-		vr = g.CardDblV
-	}
-	rank := c.Rank().Symbol()
-	suit := theme.SuitGlyph(c.Suit())
-	ink := theme.FaceStyle(c.Suit())
-	pad := strings.Repeat(" ", fullInterior-lipgloss.Width(rank))
-	mid := strings.Repeat(" ", (fullInterior-1)/2)
-	rows := []string{
-		border.Render(tl + strings.Repeat(h, fullInterior) + tr),
-		border.Render(v) + ink.Render(rank+pad) + border.Render(vr),
-		border.Render(v) + ink.Render(mid+suit+mid) + border.Render(vr),
-		border.Render(v) + ink.Render(pad+rank) + border.Render(vr),
-		border.Render(bl + strings.Repeat(h, fullInterior) + br),
-	}
-	return strings.Join(rows, "\n")
-}
-
-// fullPlaceholder is an undealt board slot at full-card size: a dim pip in
-// the box a future card will fill, so the board's width never changes as
-// streets arrive.
-func fullPlaceholder() string {
-	blank := strings.Repeat(" ", FullCardWidth)
-	mid := strings.Repeat(" ", (FullCardWidth-1)/2)
-	pip := mid + theme.Current.BoardPlaceholder.Render(theme.G.Dot) + mid
-	return strings.Join([]string{blank, blank, pip, blank, blank}, "\n")
-}
-
-// fullBoardRow renders the community board as five full-size slots.
-// highlight marks cards to draw in the emphasis frame; nil highlights none.
-func fullBoardRow(dealt []engine.Card, highlight engine.CardSet) string {
-	slots := make([]string, components.BoardSlots)
-	for i := range slots {
-		if i < len(dealt) {
-			slots[i] = FullCard(dealt[i], highlight.Has(dealt[i]))
-		} else {
-			slots[i] = fullPlaceholder()
-		}
-	}
-	return joinBlocks(" ", slots...)
-}
-
-// fullHand renders a two-card holding side by side at full size.
-func fullHand(hole [2]engine.Card, highlight engine.CardSet) string {
-	return joinBlocks(" ",
-		FullCard(hole[0], highlight.Has(hole[0])),
-		FullCard(hole[1], highlight.Has(hole[1])))
-}
+// The full-size 7x5 study card lives in internal/ui/components (FullCard,
+// FullBoardRow, FullHand), promoted from this file so the quick reference
+// and any future screen draw the same card lessons do. The visuals below
+// compose it; nothing here renders a card by hand.
 
 // VisualBoard shows community cards, optionally the hero's hole cards, and
 // optionally the best five — computed by eval.Best5, never authored, so the
@@ -177,22 +88,23 @@ func (b *VisualBoard) render(width int, compact bool) string {
 	if b.ShowBest && b.ShowHole && len(b.Board) >= 3 {
 		rank, five := eval.Best5(b.Hole, b.Board)
 		best = engine.NewCardSet(five[:]...)
-		bestLine = clipTo("Best five: "+inlineCards(five[:])+"  "+
-			theme.Current.GradeGood.Render(rank.Describe()), width)
+		// The five that play are named by their emphasis frames above, not
+		// respelled inline — the drawn highlight IS the annotation.
+		bestLine = clipTo("Best five: "+theme.Current.GradeGood.Render(rank.Describe()), width)
 	}
 	var out []string
 	out = append(out, theme.Current.Body.Render("Board"))
 	if compact {
-		out = append(out, components.BoardRow(b.Board))
+		out = append(out, components.BoardRowHighlight(b.Board, best))
 	} else {
-		out = append(out, fullBoardRow(b.Board, best))
+		out = append(out, components.FullBoardRow(b.Board, best))
 	}
 	if b.ShowHole {
 		out = append(out, theme.Current.Body.Render("Your hand"))
 		if compact {
-			out = append(out, joinBlocks(" ", components.MiniCard(b.Hole[0]), components.MiniCard(b.Hole[1])))
+			out = append(out, joinBlocks(" ", miniCardIn(b.Hole[0], best), miniCardIn(b.Hole[1], best)))
 		} else {
-			out = append(out, fullHand(b.Hole, best))
+			out = append(out, components.FullHand(b.Hole, best))
 		}
 	}
 	if bestLine != "" {
@@ -227,12 +139,12 @@ const showdownGutter = "   "
 func (s *VisualShowdown) Render(width int) string { return s.render(width, false) }
 
 func (s *VisualShowdown) render(width int, compact bool) string {
-	cardW, hand := FullCardWidth, fullHand
-	boardRow := func(b []engine.Card) string { return fullBoardRow(b, 0) }
+	cardW, hand := components.FullCardWidth, components.FullHand
+	boardRow := func(b []engine.Card) string { return components.FullBoardRow(b, 0) }
 	if compact {
 		cardW = components.MiniCardWidth
 		hand = func(hole [2]engine.Card, _ engine.CardSet) string {
-			return joinBlocks(" ", components.MiniCard(hole[0]), components.MiniCard(hole[1]))
+			return components.MiniCards(hole[0], hole[1])
 		}
 		boardRow = components.BoardRow
 	}
@@ -283,13 +195,12 @@ func joinBlocks(gap string, blocks ...string) string {
 	return strings.Join(lines, "\n")
 }
 
-// inlineCards renders cards in prose form separated by spaces.
-func inlineCards(cards []engine.Card) string {
-	parts := make([]string, len(cards))
-	for i, c := range cards {
-		parts[i] = components.InlineCard(c)
+// miniCardIn draws one mini card, emphasised when it belongs to highlight.
+func miniCardIn(c engine.Card, highlight engine.CardSet) string {
+	if highlight.Has(c) {
+		return components.MiniCardEmphasis(c)
 	}
-	return strings.Join(parts, " ")
+	return components.MiniCard(c)
 }
 
 // VisualRangeGrid is the 13×13 range chart — *the* preflop teaching device.
@@ -434,18 +345,32 @@ type VisualHandLadder struct {
 	Highlight int
 }
 
-// Render implements the visual.
+// Render implements the visual. Every tier's example hand is DRAWN — five
+// mini cards per rung, the tier's number and name riding the middle row —
+// because the ladder is the single most-looked-at teaching artifact in the
+// app and "if you're talking about hands, there should be cards on the TUI"
+// (the owner's rule). Mini cards keep a rung to 3 rows, so the whole ladder
+// is 30 rows: taller than any one screen, which is fine — the lesson view
+// scrolls and announces cropped content, and a scrolled ladder of real cards
+// teaches; an inline row of codes does not.
 func (l *VisualHandLadder) Render(width int) string {
 	rungs := LadderRungs()
-	out := make([]string, 0, len(rungs))
+	out := make([]string, 0, 3*len(rungs))
 	for i, r := range rungs {
 		nameStyle := theme.Current.Body
 		if l.Highlight == i+1 {
 			nameStyle = theme.Current.SeatToAct
 		}
-		line := fmt.Sprintf("%2d. ", i+1) + nameStyle.Render(fmt.Sprintf("%-16s", r.Name)) +
-			inlineCards(engine.MustCards(r.Cards))
-		out = append(out, clipTo(line, width))
+		label := fmt.Sprintf("%2d. ", i+1)
+		margin := strings.Repeat(" ", lipgloss.Width(label))
+		rows := strings.Split(components.MiniCards(engine.MustCards(r.Cards)...), "\n")
+		for j, row := range rows {
+			line := margin + row
+			if j == 1 { // middle row: the tier's number and name beside its cards
+				line = theme.Current.Body.Render(label) + row + "  " + nameStyle.Render(r.Name)
+			}
+			out = append(out, clipTo(line, width))
+		}
 	}
 	return strings.Join(out, "\n")
 }

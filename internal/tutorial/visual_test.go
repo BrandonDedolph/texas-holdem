@@ -1,6 +1,7 @@
 package tutorial
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -118,33 +119,39 @@ func TestShowdownLabelsEveryHand(t *testing.T) {
 	}
 }
 
-// TestFullCardGeometry pins the study card's 7x5 box: exact dimensions for
-// both rank widths, the rank in the top-left and bottom-right indices, and
-// the same footprint highlighted or not — a highlight that changed the size
-// would shift every layout that uses it.
-func TestFullCardGeometry(t *testing.T) {
-	for _, code := range []string{"As", "10d"} {
-		card := engine.MustCards(code)[0]
-		for _, highlight := range []bool{false, true} {
-			out := FullCard(card, highlight)
-			lines := strings.Split(out, "\n")
-			if len(lines) != FullCardHeight {
-				t.Fatalf("%s highlight=%v: %d rows, want %d", code, highlight, len(lines), FullCardHeight)
-			}
-			for i, l := range lines {
-				if w := lipgloss.Width(l); w != FullCardWidth {
-					t.Errorf("%s highlight=%v row %d: %d cells, want %d", code, highlight, i, w, FullCardWidth)
-				}
-			}
+// TestHandLadderDrawsCards: every rung of the ladder draws its five example
+// cards as mini cards — ten tiers, fifty card frames, each tier's name on
+// its middle row. The ladder was once an inline list of codes; this test is
+// the guard against it regressing to one. (The full-size study card's own
+// geometry tests live with it in internal/ui/components.)
+func TestHandLadderDrawsCards(t *testing.T) {
+	out := (&VisualHandLadder{}).Render(80)
+	plain := stripANSI(out)
+	rungs := LadderRungs()
+	if got, want := strings.Count(plain, theme.G.CardTL), 5*len(rungs); got != want {
+		t.Errorf("ladder draws %d card frames, want %d (5 per rung)", got, want)
+	}
+	lines := strings.Split(plain, "\n")
+	if got, want := len(lines), 3*len(rungs); got != want {
+		t.Errorf("ladder is %d rows, want %d (3 per rung)", got, want)
+	}
+	for i, r := range rungs {
+		mid := lines[3*i+1]
+		if !strings.Contains(mid, r.Name) {
+			t.Errorf("rung %d middle row %q missing tier name %q", i+1, mid, r.Name)
 		}
-		plain := stripANSI(FullCard(card, false))
-		rank := card.Rank().Symbol()
-		rows := strings.Split(plain, "\n")
-		if !strings.HasPrefix(rows[1], theme.G.CardVL+rank) {
-			t.Errorf("%s: top-left index missing, row %q", code, rows[1])
+		wantNum := strconv.Itoa(i+1) + "."
+		if !strings.Contains(mid, wantNum) {
+			t.Errorf("rung %d middle row %q missing its number %q", i+1, mid, wantNum)
 		}
-		if !strings.HasSuffix(rows[3], rank+theme.G.CardVR) {
-			t.Errorf("%s: bottom-right index missing, row %q", code, rows[3])
+		// The example hand appears as drawn card faces, not inline codes: the
+		// suit rides its own glyph inside a frame on the same three rows.
+		for _, c := range engine.MustCards(r.Cards) {
+			face := c.Rank().Symbol() + theme.SuitGlyph(c.Suit())
+			band := strings.Join(lines[3*i:3*i+3], "\n")
+			if !strings.Contains(band, face) {
+				t.Errorf("rung %d band missing drawn face %q", i+1, face)
+			}
 		}
 	}
 }

@@ -2,6 +2,7 @@ package content
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -303,6 +304,46 @@ func TestVisualsRenderAt80Cols(t *testing.T) {
 	}
 	if seen == 0 {
 		t.Error("curriculum has no visuals")
+	}
+}
+
+// wholeHandRE matches three or more consecutive card codes — a HAND spelled
+// out in prose. One or two codes are legitimate references to cards a visual
+// already draws; a run of three is a hand, and hands belong in a Visual (the
+// ladder, a board, a showdown, an order drill's drawn items), never in text.
+var wholeHandRE = regexp.MustCompile(`(?:\b(?:10|[2-9AKQJT])[cdhs]\b[,;:]? +){2}\b(?:10|[2-9AKQJT])[cdhs]\b`)
+
+// TestProseNeverSpellsWholeHands is the authoring-side half of the app's
+// rendered-frame guard: no lesson text, prompt, explanation, caption or
+// pre-deal intro may spell out a full hand as codes. In-hand Teach/Debrief
+// texts are exempt — they run beside a live table that is already drawing
+// the cards they mention.
+func TestProseNeverSpellsWholeHands(t *testing.T) {
+	check := func(id, field, s string) {
+		t.Helper()
+		if m := wholeHandRE.FindString(s); m != "" {
+			t.Errorf("lesson %q %s spells a whole hand %q in prose; draw it as cards instead",
+				id, field, m)
+		}
+	}
+	for _, l := range tutorial.All() {
+		for i, sec := range l.Sections {
+			at := fmt.Sprintf("section %d %s", i+1, sec.Kind)
+			check(l.ID, at+" text", sec.Text)
+			if sec.Visual != nil {
+				check(l.ID, at+" caption", sec.Visual.Caption)
+			}
+			if d := sec.Drill; d != nil {
+				check(l.ID, at+" prompt", d.Prompt)
+				check(l.ID, at+" explanation", d.Explain)
+				if d.Visual != nil {
+					check(l.ID, at+" caption", d.Visual.Caption)
+				}
+			}
+			if s := sec.Script; s != nil {
+				check(l.ID, at+" intro", s.Intro)
+			}
+		}
 	}
 }
 
