@@ -1,18 +1,19 @@
  Hand #1 · 6-max NLHE · blinds 5/10 · PREFLOP                BTN · ? help   ╭──────────────────────────╮
-                                                                            │ COACH                    │
-       Nia ᴮᴮ 990            Cole ᵁᵀᴳ 1,000        Ivy ᴴᴶ 1,000             │                          │
-     ▓▓ ▓▓  ● 10           · ·                   · ·                        │ Raise to 25              │
-                           folds                 folds                      │                          │
-                                                                            │ 77 is in the BTN open    │
-   Tara ˢᴮ 995                                         Sam ᶜᴼ 1,000         │ chart. From the Button   │
- ▓▓ ▓▓  ● 5               ·    ·    ·    ·    ·      · ·                    │ you act last —           │
-                                                     folds                  │ position is money.       │
-                                  POT 15                                    │                          │
-                                                                            │ to call 10               │
-                         ╭──╮ ╭──╮                                          │ pot odds 1.5:1 (40%)     │
-   ► YOU ᴮᵀᴺ Ⓓ 1,000     │7♥│ │7♣│        pair of sevens                    │                          │
-                         ╰──╯ ╰──╯                                          │                          │
-                                                                            │                          │
+ ╭───────────────────────┤  ✗ Cole ᵁᵀᴳ · loose  ├───────────────────────╮   │ COACH                    │
+ │                            1,000 ✗ folded                            │   │                          │
+ │                              ●●● POT 15                              │   │ Raise to 25              │
+ ├ 6 Nia ᴮᴮ · solid ──╮                            ╭─ ✗ Ivy ᴴᴶ · sticky ┤   │                          │
+ │ 990           ● 10 │                            │ ✗ folded     1,000 │   │ 77 is in the BTN open    │
+ ├────────────────────╯                            ╰────────────────────┤   │ chart. From the Button   │
+ │                        ·    ·    ·    ·    ·                         │   │ you act last —           │
+ │                                                                      │   │ position is money.       │
+ ├ 5 Tara ˢᴮ · tight ─╮                            ╭─── ✗ Sam ᶜᴼ · wild ┤   │                          │
+ │ 995            ● 5 │                            │ ✗ folded     1,000 │   │ to call 10               │
+ ├────────────────────╯         ╭──╮ ╭──╮          ╰────────────────────┤   │ pot odds 1.5:1 (40%)     │
+ │           pair of sevens ─   │7♥│ │7♣│  ─ flops a set about 1 in 8.… │   │                          │
+ │                              ╰──╯ ╰──╯  call 2 to win 3 — need 40%   │   │                          │
+ ╰──────────────────────┤  4 ► YOU ᴮᵀᴺ Ⓓ  1,000  ├──────────────────────╯   │                          │
+ order  ✗ Cole · ✗ Ivy · ✗ Sam · ► 4 YOU · 5 Tara ● 5 · 6 Nia ● 10          │                          │
 ──────────────────────────────────────────────────────────────────────────  │                          │
                                                                             │                          │
                                                                             │                          │
@@ -21,8 +22,7 @@
  Ivy folds                                                                  │                          │
  Sam folds                                                                  │                          │
 ──────────────────────────────────────────────────────────────────────────  │                          │
-  f fold      c call 10      r raise…    to call 10 · pot odds 1.5:1 (40%)  │                          │
-                                                                            │                          │
+  ▓ f FOLD ▓   ▓ c CALL 10 ▓   ▓ r RAISE… ▓                                 │                          │
                                                                             │                          │
                                                                             │                          │
                                                                             │                          │

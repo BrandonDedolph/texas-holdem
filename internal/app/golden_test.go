@@ -109,6 +109,7 @@ func TestGoldenTable(t *testing.T) {
 		{"flop_sizing", scenarioFlopSizing},
 		{"sidepot_allin", scenarioSidePot},
 		{"showdown", scenarioShowdown},
+		{"between_hands", scenarioBetweenHands},
 	}
 	for _, sc := range scenarios {
 		for _, sz := range goldenSizes {

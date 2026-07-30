@@ -208,13 +208,13 @@ func TestTableChoosingKeysMatchRenderedKeycaps(t *testing.T) {
 		{
 			name:     "preflop facing the blind",
 			scenario: scenarioPreflop,
-			acts:     map[string]string{"f": "f fold", "c": "c call", "r": "r raise"},
+			acts:     map[string]string{"f": "f FOLD", "c": "c CALL", "r": "r RAISE"},
 			ignored:  []string{"x", "b"},
 		},
 		{
 			name:     "flop checked to hero",
 			scenario: scenarioFlopChoosing,
-			acts:     map[string]string{"x": "x check", "b": "b bet"},
+			acts:     map[string]string{"x": "x CHECK", "b": "b BET"},
 			ignored:  []string{"f", "c"},
 		},
 	}

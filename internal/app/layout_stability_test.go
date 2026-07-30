@@ -219,12 +219,14 @@ func TestTableLayoutStable(t *testing.T) {
 
 // TestTableSidePotLineStable: the pot region switching from a single POT to
 // MAIN + SIDE layers must not move anything else (the pot text itself is
-// centered and changes, so it is deliberately not an anchor).
+// centered and changes, so it is deliberately not an anchor — and since the
+// pot tray sits above the plates and names its eligible seats, "Nia" would
+// probe the tray, so the seat anchor here is Sam, who is in no pot list).
 func TestTableSidePotLineStable(t *testing.T) {
 	m := buildTable(t, scenarioSidePot(), 80, 24)
 	sized(t, m, 80, 24)
 	assertAnchorsStable(t, m.View,
-		[]string{"Hand #1", "YOU", "Nia", "esc menu"},
+		[]string{"Hand #1", "YOU", "Sam", "esc menu"},
 		map[string]func(){
 			"single pot":  func() { m.awardText = "POT 1,060" },
 			"multi again": func() { m.awardText = "" },

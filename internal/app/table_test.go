@@ -176,6 +176,65 @@ func scenarioShowdown() tableScenario {
 	return sc
 }
 
+// scenarioBetweenHands: the hero opens to 25 and everyone folds — the hand
+// ends with no showdown, resting between hands with the pot paid over
+// mucked cards. The rest state the showdown scenario cannot show.
+func scenarioBetweenHands() tableScenario {
+	sc := scenarioPreflop()
+	sc.script[1] = []engine.Action{engine.Fold{S: 1}}
+	sc.script[2] = []engine.Action{engine.Fold{S: 2}}
+	sc.keys = []string{"r", "enter"}
+	return sc
+}
+
+// TestOrderDigitsRenumberAcrossStreets pins the Direction E headline
+// feature: every plate carries its action-order digit for THIS street, and
+// the digits re-stamp when the street turns. Preflop the action opens left
+// of the big blind, so the blinds act last; postflop it opens left of the
+// button, so the blinds act first — the same six fixed plates renumbering
+// is the rule made visible.
+func TestOrderDigitsRenumberAcrossStreets(t *testing.T) {
+	sc := scenarioPreflop()
+	sc.script[1] = []engine.Action{engine.Call{S: 1}, engine.Check{S: 1}}
+	sc.script[2] = []engine.Action{engine.Check{S: 2}, engine.Check{S: 2}}
+	m := buildTable(t, sc, 80, 24)
+
+	// Preflop: hero on the button acts 4th; the blinds are stamped last.
+	view := stripANSI(m.View())
+	for _, want := range []string{"4 ► YOU", "5 Tara", "6 Nia"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("preflop frame missing order stamp %q:\n%s", want, view)
+		}
+	}
+
+	// The hero calls, the flop lands, and the SAME plates re-stamp: the
+	// blinds now act first and the button last.
+	m.Update(key("c"))
+	pumpTable(t, m)
+	if m.hand.Street() != engine.Flop {
+		t.Fatalf("setup: want the flop, got %v", m.hand.Street())
+	}
+	view = stripANSI(m.View())
+	for _, want := range []string{"1 Tara", "2 Nia", "6 ► YOU"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("flop frame missing re-stamped order %q:\n%s", want, view)
+		}
+	}
+	if strings.Contains(view, "4 ► YOU") || strings.Contains(view, "5 Tara") {
+		t.Errorf("preflop digits survived the street change:\n%s", view)
+	}
+
+	// The digits are the one Hexagon organ that survives the compact
+	// ledger: the 60x20 frame carries the same re-stamped column.
+	m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+	view = stripANSI(m.View())
+	for _, want := range []string{"1   Tara", "2   Nia"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("compact frame missing order digit %q:\n%s", want, view)
+		}
+	}
+}
+
 func TestTableReachesHeroTurnPreflop(t *testing.T) {
 	m := buildTable(t, scenarioPreflop(), 80, 24)
 	if m.bar.State() != ActionBarChoosing {
@@ -506,13 +565,14 @@ func TestMistakesStripSilentUntilError(t *testing.T) {
 	}
 }
 
-// heroLineOf returns the hero's reserved action/grade line — row 15 of the
-// 80x24 full layout — ANSI-stripped, when it carries the given action text;
-// "" otherwise. Addressing the fixed row is the point: the budget promises
-// the line is always exactly there.
+// heroLineOf returns the hero's reserved action/grade line — the felt row
+// beside his cards, row 13 of the 80x24 full layout (ring cardsTop+2) —
+// ANSI-stripped, when it carries the given action text; "" otherwise.
+// Addressing the fixed row is the point: the budget promises the line is
+// always exactly there.
 func heroLineOf(view, action string) string {
 	rows := strings.Split(stripANSI(view), "\n")
-	const heroLineRow = 14 // row 15, zero-indexed
+	const heroLineRow = 12 // row 13, zero-indexed
 	if len(rows) <= heroLineRow || !strings.Contains(rows[heroLineRow], action) {
 		return ""
 	}

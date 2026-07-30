@@ -7,6 +7,7 @@ import (
 	"github.com/BrandonDedolph/texas-holdem/internal/engine"
 	"github.com/BrandonDedolph/texas-holdem/internal/ui/components"
 	"github.com/BrandonDedolph/texas-holdem/internal/ui/theme"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // The action bar (docs/design-tui.md §4): a two-row region with three
@@ -336,39 +337,45 @@ func (b *ActionBar) View(width int) string {
 	return top + "\n" + bottom
 }
 
-// choosingRow renders one keycap chip per visible legal action with its
-// cost. Only legal actions render — no dimmed-out fold; absence teaches
-// legality better than presence-but-disabled (§4.1).
+// choosingRow renders one filled button per visible legal action with its
+// cost, each in its semantic action ink — fold red, check green, call blue,
+// raise violet, all-in gold — so the verbs are told apart at a glance
+// before the words are read (table-redesign-pitch §2.1). Only legal actions
+// render — no dimmed-out fold; absence teaches legality better than
+// presence-but-disabled (§4.1).
 func (b *ActionBar) choosingRow() string {
 	th := theme.Current
 	g := theme.G
 	var sb strings.Builder
 	sb.WriteString("  ")
+	first := true
 	for _, o := range b.visibleOptions() {
 		var key, label string
+		var style lipgloss.Style
 		switch o.Type {
 		case engine.ActionFold:
-			key, label = "f", "fold"
+			key, label, style = "f", "FOLD", th.ButtonFold
 		case engine.ActionCheck:
-			key, label = "x", "check"
+			key, label, style = "x", "CHECK", th.ButtonCheck
 		case engine.ActionCall:
-			key, label = "c", "call "+o.Min.String()
+			key, label, style = "c", "CALL "+o.Min.String(), th.ButtonCall
 		case engine.ActionBet:
-			key, label = "b", "bet"+g.Ellipsis
+			key, label, style = "b", "BET"+g.Ellipsis, th.ButtonRaise
 		case engine.ActionRaise:
 			if o.Min == o.Max {
-				// The only legal raise is all-in: say so on the keycap.
-				key, label = "r", "all-in "+o.Max.String()
+				// The only legal raise is all-in: say so on the button.
+				key, label, style = "r", "ALL-IN "+o.Max.String(), th.ButtonAllIn
 			} else {
-				key, label = "r", "raise"+g.Ellipsis
+				key, label, style = "r", "RAISE"+g.Ellipsis, th.ButtonRaise
 			}
 		}
-		sb.WriteString(th.ActionKeycap.Render(key))
-		sb.WriteString(" ")
-		sb.WriteString(th.ActionLabel.Render(label))
-		sb.WriteString("      ")
+		if !first {
+			sb.WriteString("   ")
+		}
+		first = false
+		sb.WriteString(style.Render(g.ButtonFill + " " + key + " " + label + " " + g.ButtonFill))
 	}
-	return strings.TrimRight(sb.String(), " ")
+	return sb.String()
 }
 
 // sizingRow renders the slider readout row:

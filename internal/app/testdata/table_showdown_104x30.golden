@@ -1,18 +1,19 @@
  Hand #1 · 6-max NLHE · blinds 5/10 · RIVER                  BTN · ? help   ╭──────────────────────────╮
-                                                                            │ COACH                    │
-       Nia ᴮᴮ 990            Cole ᵁᵀᴳ 1,000        Ivy ᴴᴶ 1,000             │                          │
-     6♥ 2♥                 · ·                   · ·                        │ hand over · 3 Best, 1    │
-     shows pair of tens    folds                 folds                      │ Inaccuracy (-0.7bb) · v  │
-                                                                            │ review                   │
-   Tara ˢᴮ 1,020         ╭──╮ ╭──╮ ╭──╮ ╭──╮ ╭──╮      Sam ᶜᴼ 1,000         │                          │
- T♣ 6♠                   │8♥│ │J♣│ │T♠│ │T♦│ │4♦│    · ·                    │                          │
- shows three of a ki…    ╰──╯ ╰──╯ ╰──╯ ╰──╯ ╰──╯    folds                  │                          │
-                  POT 30 to Tara (three of a kind, tens)                    │                          │
-                                                                            │                          │
-                         ╭──╮ ╭──╮                                          │                          │
-     YOU ᴮᵀᴺ Ⓓ 990       │7♥│ │7♣│        two pair, tens and sevens         │                          │
-                         ╰──╯ ╰──╯                                          │                          │
-   shows two pair, tens and sevens                                          │                          │
+ ╭───────────────────────┤  ✗ Cole ᵁᵀᴳ · loose  ├───────────────────────╮   │ COACH                    │
+ │                            1,000 ✗ folded                            │   │                          │
+ │                POT 30 to Tara (three of a kind, tens)                │   │ hand over · 3 Best, 1    │
+ ├ 2 Nia ᴮᴮ · solid ──╮                            ╭─ ✗ Ivy ᴴᴶ · sticky ┤   │ Inaccuracy (-0.7bb) · v  │
+ │ 990                │  6♥ 2♥                     │ ✗ folded     1,000 │   │ review                   │
+ ├────────────────────╯                            ╰────────────────────┤   │                          │
+ │                        8♥   J♣   T♠   T♦   4♦                        │   │                          │
+ │                                                                      │   │                          │
+ ├ 1 Tara ˢᴮ · tight ─╮                            ╭─── ✗ Sam ᶜᴼ · wild ┤   │                          │
+ │ 1,020              │  T♣ 6♠                     │ ✗ folded     1,000 │   │                          │
+ ├────────────────────╯         ╭──╮ ╭──╮          ╰────────────────────┤   │                          │
+ │  two pair, tens and sev… ─   │7♥│ │7♣│  ─ two pair, tens and sevens… │   │                          │
+ │ shows two pair, tens and …   ╰──╯ ╰──╯                               │   │                          │
+ ╰──────────────────────┤    6 YOU ᴮᵀᴺ Ⓓ  990    ├──────────────────────╯   │                          │
+ order  1 Tara · 2 Nia · ✗ Cole · ✗ Ivy · ✗ Sam · 6 YOU                     │                          │
 ──────────────────────────────────────────────────────────────────────────  │                          │
  Tara checks                                                                │                          │
  Nia checks                                                                 │                          │
@@ -21,8 +22,7 @@
  Nia checks                                                                 │                          │
  YOU checks                                                                 │                          │
 ──────────────────────────────────────────────────────────────────────────  │                          │
-                                                                            │                          │
-                                                                            │ ──────────────────────── │
+  ▓ space DEAL NEXT ▓   ▓ v REVIEW ▓                                        │ ──────────────────────── │
                                                                             │ SESSION                  │
                                                                             │ hands 1                  │
                                                                             │ decisions 75% good (3/4) │
