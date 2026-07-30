@@ -73,15 +73,16 @@ func TestMiniCardInvalidCard(t *testing.T) {
 	})
 }
 
-func TestMiniCardTenRendersAsT(t *testing.T) {
+func TestMiniCardTenRendersAs10(t *testing.T) {
+	// The owner's decision: the ten renders "10" everywhere, never "T".
 	glyphSets(t, func(t *testing.T) {
 		card := MiniCard(engine.MustCard("Th"))
-		if strings.Contains(card, "10") {
-			t.Errorf("ten must render as T, never 10:\n%s", card)
-		}
-		want := "T" + theme.SuitGlyph(engine.Hearts)
+		want := "10" + theme.SuitGlyph(engine.Hearts)
 		if !strings.Contains(card, want) {
 			t.Errorf("MiniCard(Th) missing %q:\n%s", want, card)
+		}
+		if strings.Contains(card, "T"+theme.SuitGlyph(engine.Hearts)) {
+			t.Errorf("ten must render as 10, never T:\n%s", card)
 		}
 	})
 }
@@ -89,7 +90,7 @@ func TestMiniCardTenRendersAsT(t *testing.T) {
 func TestMiniCardFaceContent(t *testing.T) {
 	glyphSets(t, func(t *testing.T) {
 		for _, c := range allCards() {
-			face := string(c.Rank().Letter()) + theme.SuitGlyph(c.Suit())
+			face := c.Rank().Symbol() + theme.SuitGlyph(c.Suit())
 			if got := MiniCard(c); !strings.Contains(got, face) {
 				t.Errorf("MiniCard(%s) missing face %q:\n%s", c.Code(), face, got)
 			}
@@ -97,28 +98,42 @@ func TestMiniCardFaceContent(t *testing.T) {
 	})
 }
 
-func TestInlineCardUniformWidthAll52(t *testing.T) {
+func TestInlineCardWidthsAll52(t *testing.T) {
+	// Inline cards are natural width: two cells, three for the wide "10"
+	// rank. The fixed-slot form pads everything to InlineCardWidth.
 	glyphSets(t, func(t *testing.T) {
-		want := lipgloss.Width(InlineCard(engine.MustCard("As")))
 		for _, c := range allCards() {
+			want := 2
+			if c.Rank() == engine.Ten {
+				want = 3
+			}
 			if w := lipgloss.Width(InlineCard(c)); w != want {
 				t.Errorf("InlineCard(%s) is %d cells, want %d", c.Code(), w, want)
 			}
+			if w := lipgloss.Width(InlineCardSlot(c)); w != InlineCardWidth {
+				t.Errorf("InlineCardSlot(%s) is %d cells, want %d", c.Code(), w, InlineCardWidth)
+			}
 		}
-		// The invalid-card form must hold the same width too.
-		if w := lipgloss.Width(InlineCard(engine.Card(52))); w != want {
-			t.Errorf("InlineCard(invalid) is %d cells, want %d", w, want)
+		// The invalid-card forms hold their widths too.
+		if w := lipgloss.Width(InlineCard(engine.Card(52))); w != 2 {
+			t.Errorf("InlineCard(invalid) is %d cells, want 2", w)
+		}
+		if w := lipgloss.Width(InlineCardSlot(engine.Card(52))); w != InlineCardWidth {
+			t.Errorf("InlineCardSlot(invalid) is %d cells, want %d", w, InlineCardWidth)
 		}
 	})
 }
 
 func TestInlineCardWidthMatchesAcrossGlyphSets(t *testing.T) {
-	setGlyphs(t, theme.Unicode())
-	uni := lipgloss.Width(InlineCard(engine.MustCard("As")))
-	setGlyphs(t, theme.ASCII())
-	asc := lipgloss.Width(InlineCard(engine.MustCard("As")))
-	if uni != asc {
-		t.Errorf("InlineCard width differs between glyph sets: unicode %d, ascii %d", uni, asc)
+	for _, code := range []string{"As", "Th"} {
+		setGlyphs(t, theme.Unicode())
+		uni := lipgloss.Width(InlineCard(engine.MustCard(code)))
+		setGlyphs(t, theme.ASCII())
+		asc := lipgloss.Width(InlineCard(engine.MustCard(code)))
+		if uni != asc {
+			t.Errorf("InlineCard(%s) width differs between glyph sets: unicode %d, ascii %d",
+				code, uni, asc)
+		}
 	}
 }
 

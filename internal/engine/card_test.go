@@ -77,6 +77,24 @@ func TestCardStringAndCodeRoundTrip(t *testing.T) {
 	}
 }
 
+func TestTenDisplaysAs10(t *testing.T) {
+	// The owner's decision: the ten renders "10" on output everywhere;
+	// "T" survives only as an input alias.
+	ten := MakeCard(Ten, Diamonds)
+	if got := ten.Code(); got != "10d" {
+		t.Errorf("Code = %q, want %q", got, "10d")
+	}
+	if got := ten.String(); got != "10♦" {
+		t.Errorf("String = %q, want %q", got, "10♦")
+	}
+	if got := Ten.Symbol(); got != "10" {
+		t.Errorf("Symbol = %q, want %q", got, "10")
+	}
+	if got := CardsString([]Card{ten, MustCard("9s")}); got != "10d 9s" {
+		t.Errorf("CardsString = %q, want %q", got, "10d 9s")
+	}
+}
+
 func TestParseCards(t *testing.T) {
 	want := []Card{MustCard("As"), MustCard("Kd"), MustCard("7h")}
 	for _, in := range []string{"As Kd 7h", "AsKd7h", "  As   Kd 7h  ", "as kd 7h"} {
@@ -92,6 +110,21 @@ func TestParseCards(t *testing.T) {
 				t.Fatalf("ParseCards(%q) = %v, want %v", in, CardsString(got), CardsString(want))
 			}
 		}
+	}
+
+	// Runs and lists round-trip the three-character "10" codes too.
+	wantTens := []Card{MustCard("As"), MustCard("Td"), MustCard("Th")}
+	for _, in := range []string{"As 10d 10h", "As10d10h", "As Td 10h", "AsTd10h"} {
+		got, err := ParseCards(in)
+		if err != nil {
+			t.Fatalf("ParseCards(%q) error: %v", in, err)
+		}
+		if CardsString(got) != CardsString(wantTens) {
+			t.Fatalf("ParseCards(%q) = %v, want %v", in, CardsString(got), CardsString(wantTens))
+		}
+	}
+	if got, err := ParseCards(CardsString(wantTens)); err != nil || CardsString(got) != "As 10d 10h" {
+		t.Fatalf("CardsString round-trip = %v (%v), want As 10d 10h", CardsString(got), err)
 	}
 
 	if _, err := ParseCards("AsKd7"); err == nil {

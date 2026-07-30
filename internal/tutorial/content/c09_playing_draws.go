@@ -33,7 +33,7 @@ func init() {
 			{
 				Kind: tutorial.SectionDrill,
 				Drill: &tutorial.Drill{
-					Prompt: "You hold 9h 8h on Th 7c 2d — open-ended. How many clean " +
+					Prompt: "You hold 9h 8h on 10h 7c 2d — open-ended. How many clean " +
 						"outs? (exact)",
 					Answer: tutorial.NumericAnswer{Value: 8},
 					Explain: "Eight: four jacks and four sixes complete the straight. " +

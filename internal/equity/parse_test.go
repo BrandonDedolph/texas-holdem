@@ -81,7 +81,9 @@ func TestStringMergesRuns(t *testing.T) {
 	cases := []struct{ spec, want string }{
 		{"QQ, KK, AA", "QQ+"},
 		{"99, 88, 77, 66", "99-66"},
-		{"AKs, AQs, ATs", "AQs+, ATs"},
+		{"AKs, AQs, ATs", "AQs+, A10s"}, // the ten serializes as "10", never "T"
+		{"QQ, JJ, TT", "QQ-1010"},
+		{"A10s, KTs", "A10s, K10s"}, // both input spellings, one output
 		{"A2s, A3s, A4s, A5s", "A5s-A2s"},
 		{"AhKh", "AhKh"},
 		{"[50]KQo", "[50]KQo"},

@@ -49,8 +49,10 @@ const (
 	heroPlateW   = 26
 	sidePlateW   = 22
 
-	heroCardsW   = 2*components.MiniCardWidth + 1                        // two mini cards, one gap
-	boardInlineW = components.BoardSlots*2 + (components.BoardSlots-1)*3 // inline cards, 3-col gaps
+	heroCardsW = 2*components.MiniCardWidth + 1 // two mini cards, one gap
+	// boardInlineW: five fixed inline slots (each padded to the "10" card's
+	// three cells) with 3-col gaps.
+	boardInlineW = components.BoardSlots*components.InlineCardWidth + (components.BoardSlots-1)*3
 
 	// boardW is the width of five mini-card slots with one-col gaps — the
 	// hand review's board band still draws the mini-card form.
@@ -514,16 +516,19 @@ func (m *TableScreen) boardPiece() string {
 			board = board[:m.boardShown]
 		}
 	}
+	// Every slot is exactly InlineCardWidth cells — a placeholder pip must
+	// occupy the same box a dealt "10" will, or the board would shift.
 	parts := make([]string, components.BoardSlots)
 	for i := range parts {
 		switch {
 		case i < len(board) && m.winners.Has(board[i]):
-			c := board[i]
-			parts[i] = th.CardWinner.Render(string(c.Rank().Letter()) + theme.SuitGlyph(c.Suit()))
+			parts[i] = padStyledTo(th.CardWinner.Render(components.CardFace(board[i])),
+				components.InlineCardWidth)
 		case i < len(board):
-			parts[i] = components.InlineCard(board[i])
+			parts[i] = components.InlineCardSlot(board[i])
 		default:
-			parts[i] = th.BoardPlaceholder.Render(theme.G.Dot) + " "
+			parts[i] = th.BoardPlaceholder.Render(theme.G.Dot) +
+				strings.Repeat(" ", components.InlineCardWidth-1)
 		}
 	}
 	return strings.Join(parts, "   ")
@@ -651,16 +656,24 @@ func placeholderCell() string {
 func winnerMiniCard(c engine.Card) string {
 	g := theme.G
 	border := theme.Current.CardWinner
-	face := "??"
-	interior := border.Render(face)
+	interior := border.Render(padCardFace("??"))
 	if c.Valid() {
-		face = string(c.Rank().Letter()) + theme.SuitGlyph(c.Suit())
-		interior = theme.SuitStyle(c.Suit()).Bold(true).Render(face)
+		interior = theme.SuitStyle(c.Suit()).Bold(true).Render(padCardFace(components.CardFace(c)))
 	}
-	top := border.Render(g.CardTL + g.CardH + g.CardH + g.CardTR)
+	rail := strings.Repeat(g.CardH, components.MiniCardWidth-2)
+	top := border.Render(g.CardTL + rail + g.CardTR)
 	mid := border.Render(g.CardVL) + interior + border.Render(g.CardVR)
-	bottom := border.Render(g.CardBL + g.CardH + g.CardH + g.CardBR)
+	bottom := border.Render(g.CardBL + rail + g.CardBR)
 	return top + "\n" + mid + "\n" + bottom
+}
+
+// padCardFace pads a plain card face to the mini card's interior width —
+// "A♠ " next to "10♠", matching components.MiniCard's geometry.
+func padCardFace(face string) string {
+	if gap := components.MiniCardWidth - 2 - lipgloss.Width(face); gap > 0 {
+		return face + strings.Repeat(" ", gap)
+	}
+	return face
 }
 
 // heroStrength is the hand-strength label left of the hero's cards:
@@ -994,8 +1007,9 @@ func (m *TableScreen) viewCompact(w, h int) string {
 	return cropHeight(strings.Join(rows, "\n"), h)
 }
 
-// compactBoardRow: " Board  K. 7. 2. .  .        top pair" — inline cards,
-// dot pips for undealt slots, strength label right-aligned.
+// compactBoardRow: " Board  K♠  7♦  10♣ ·   ·        top pair" — inline
+// cards in fixed three-cell slots, dot pips for undealt ones, strength
+// label right-aligned.
 func (m *TableScreen) compactBoardRow(w int) string {
 	th := theme.Current
 	var sb strings.Builder
@@ -1009,9 +1023,10 @@ func (m *TableScreen) compactBoardRow(w int) string {
 	}
 	for i := 0; i < components.BoardSlots; i++ {
 		if i < len(board) {
-			sb.WriteString(components.InlineCard(board[i]) + " ")
+			sb.WriteString(components.InlineCardSlot(board[i]) + " ")
 		} else {
-			sb.WriteString(th.BoardPlaceholder.Render(theme.G.Dot) + "  ")
+			sb.WriteString(th.BoardPlaceholder.Render(theme.G.Dot) +
+				strings.Repeat(" ", components.InlineCardWidth))
 		}
 	}
 	label := th.SeatAction.Render(clip(m.heroStrength(), w/2) + " ")

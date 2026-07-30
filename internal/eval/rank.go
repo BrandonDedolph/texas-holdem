@@ -146,15 +146,16 @@ func straightSpan(top engine.Rank) string {
 	return low.String() + " to " + top.String()
 }
 
-// rankRun renders ranks as a hyphenated run of letters: "K-Q-9-7-3". Used for
-// flushes, where every card plays and none of them is a kicker.
+// rankRun renders ranks as a hyphenated run of symbols: "K-Q-9-7-3",
+// "K-J-10-6-4". Used for flushes, where every card plays and none of them
+// is a kicker.
 func rankRun(ks ...engine.Rank) string {
 	var b strings.Builder
 	for i, k := range ks {
 		if i > 0 {
 			b.WriteByte('-')
 		}
-		b.WriteByte(k.Letter())
+		b.WriteString(k.Symbol())
 	}
 	return b.String()
 }

@@ -319,9 +319,10 @@ func (r *HandReview) boardLine(w int) string {
 	sb.WriteString(" " + th.Header.Render("Board") + "  ")
 	for i := 0; i < components.BoardSlots; i++ {
 		if i < len(board) {
-			sb.WriteString(components.InlineCard(board[i]) + " ")
+			sb.WriteString(components.InlineCardSlot(board[i]) + " ")
 		} else {
-			sb.WriteString(th.BoardPlaceholder.Render(theme.G.Dot) + "  ")
+			sb.WriteString(th.BoardPlaceholder.Render(theme.G.Dot) +
+				strings.Repeat(" ", components.InlineCardWidth))
 		}
 	}
 	return rowLR(w, sb.String(), r.potText(w/2)+" ")
@@ -558,12 +559,12 @@ func heroActionText(d *review.DecisionFrame) string {
 }
 
 // cardsText renders cards as plain text through the theme's glyph set
-// ("K♠ Q♠", or "Ks Qs" in the ASCII set) — safe inside styled lines because
-// it carries no styling of its own.
+// ("K♠ 10♠", or "Ks 10s" in the ASCII set) — safe inside styled lines
+// because it carries no styling of its own.
 func cardsText(cards []engine.Card) string {
 	parts := make([]string, len(cards))
 	for i, c := range cards {
-		parts[i] = string(c.Rank().Letter()) + theme.SuitGlyph(c.Suit())
+		parts[i] = components.CardFace(c)
 	}
 	return strings.Join(parts, " ")
 }

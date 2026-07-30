@@ -306,13 +306,13 @@ func purposePhrase(purpose string) string {
 	}
 }
 
-// holeCombo renders hole cards in range notation: "AJs", "98o", "TT".
+// holeCombo renders hole cards in range notation: "AJs", "98o", "1010".
 func holeCombo(hole [2]engine.Card) string {
 	hi, lo := hole[0].Rank(), hole[1].Rank()
 	if hi < lo {
 		hi, lo = lo, hi
 	}
-	s := string(hi.Letter()) + string(lo.Letter())
+	s := hi.Symbol() + lo.Symbol()
 	switch {
 	case hi == lo:
 		return s

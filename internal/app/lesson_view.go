@@ -1053,9 +1053,10 @@ func (r *scriptRun) boardRow(width int) string {
 	board := r.hand.Board()
 	for i := 0; i < components.BoardSlots; i++ {
 		if i < len(board) {
-			sb.WriteString(components.InlineCard(board[i]) + " ")
+			sb.WriteString(components.InlineCardSlot(board[i]) + " ")
 		} else {
-			sb.WriteString(th.BoardPlaceholder.Render(theme.G.Dot) + "  ")
+			sb.WriteString(th.BoardPlaceholder.Render(theme.G.Dot) +
+				strings.Repeat(" ", components.InlineCardWidth))
 		}
 	}
 	out := sb.String()

@@ -15,10 +15,12 @@ import (
 // the player is estimating against something they could reconstruct. The
 // specs are data, but nothing about the *answer* is: the equity is computed
 // against the parsed range, and a test parses every spec.
+// The specs are quoted verbatim in the prompt, so they use the app's "10"
+// spelling (never "T") — ParseRange accepts both forms.
 var namedRanges = []struct{ name, spec string }{
-	{"a tight opening range", "77+, ATs+, KQs, AJo+, KQo"},
-	{"a button opening range", "22+, A2s+, K9s+, Q9s+, J9s+, T8s+, 97s+, 87s, 76s, A8o+, KTo+, QTo+, JTo"},
-	{"a 3-bet range", "TT+, AQs+, AQo+, A5s"},
+	{"a tight opening range", "77+, A10s+, KQs, AJo+, KQo"},
+	{"a button opening range", "22+, A2s+, K9s+, Q9s+, J9s+, 108s+, 97s+, 87s, 76s, A8o+, K10o+, Q10o+, J10o"},
+	{"a 3-bet range", "1010+, AQs+, AQo+, A5s"},
 }
 
 // equityTolerance and the half-credit band (equityHalfMargin, trainer.go)

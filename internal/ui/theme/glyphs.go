@@ -21,10 +21,10 @@ type Glyphs struct {
 	// Suit symbols, one cell each.
 	SuitSpade, SuitHeart, SuitDiamond, SuitClub string
 
-	// Card states. FaceDown is the interior of a face-down mini card (2
-	// cells); Mucked marks folded hole cards (3 cells); BoardSlot is the
-	// full middle row of an undealt board slot (4 cells, the width of a
-	// mini card).
+	// Card states. FaceDown is the interior of a face-down mini card (3
+	// cells, sized for the "10" rank); Mucked marks folded hole cards (3
+	// cells); BoardSlot is the full middle row of an undealt board slot
+	// (5 cells, the width of a mini card).
 	FaceDown, Mucked, BoardSlot string
 
 	// Table badges. Dealer is the dealer disc (3 cells, padded to match
@@ -74,9 +74,9 @@ func Unicode() Glyphs {
 		SuitDiamond: "♦",
 		SuitClub:    "♣",
 
-		FaceDown:  "▓▓",
+		FaceDown:  "▓▓▓",
 		Mucked:    "· ·",
-		BoardSlot: " ·  ",
+		BoardSlot: "  ·  ",
 
 		Dealer:       " Ⓓ ",
 		ToAct:        "► ",
@@ -129,8 +129,8 @@ func Unicode() Glyphs {
 }
 
 // ASCII returns the pure-ASCII fallback set for terminals without Unicode.
-// Cards render as bracket pairs ([As] face up, [##] face down, [--] for an
-// undealt board slot) and box drawing degrades to -, | and +.
+// Cards render as bracket pairs ([As ] or [10s] face up, [###] face down,
+// [---] for an undealt board slot) and box drawing degrades to -, | and +.
 func ASCII() Glyphs {
 	return Glyphs{
 		SuitSpade:   "s",
@@ -138,9 +138,9 @@ func ASCII() Glyphs {
 		SuitDiamond: "d",
 		SuitClub:    "c",
 
-		FaceDown:  "##",
+		FaceDown:  "###",
 		Mucked:    ". .",
-		BoardSlot: "[--]",
+		BoardSlot: "[---]",
 
 		Dealer:       "(D)",
 		ToAct:        "->",

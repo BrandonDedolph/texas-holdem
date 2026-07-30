@@ -37,7 +37,7 @@ type SeatView struct {
 // Render renders the three-row seat block, each row exactly the slot width:
 //
 //	Nia HJ 830          name, position badge, dealer disc, stack
-//	## ##  * 30         hole cards and chips in front
+//	### ###  * 30       hole cards and chips in front
 //	raises to 30        last action this street (reserved even when blank)
 //
 // Rows never wrap: the name and action label truncate instead, so the block
@@ -141,7 +141,7 @@ func (v SeatView) headerSegs(w int) []seg {
 
 // cardSegs builds the hole-card segments: mucked pips when folded, face-up
 // inline cards at showdown, a face-down pair otherwise. spaced selects the
-// three-row block form ("## ##"); the compact form glues the pair ("####").
+// three-row block form ("### ###"); the compact form glues the pair ("######").
 func (v SeatView) cardSegs(spaced bool) []seg {
 	g := theme.G
 	th := theme.Current
@@ -181,8 +181,7 @@ func inlineCardSegs(c engine.Card) []seg {
 	if !c.Valid() {
 		return []seg{{"??", theme.Current.CardBorder}}
 	}
-	face := string(c.Rank().Letter()) + theme.SuitGlyph(c.Suit())
-	return []seg{{face, theme.SuitStyle(c.Suit())}}
+	return []seg{{CardFace(c), theme.SuitStyle(c.Suit())}}
 }
 
 func (v SeatView) actionStyle() lipgloss.Style {
