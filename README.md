@@ -2,27 +2,27 @@
 
 ![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)
 ![License](https://img.shields.io/badge/License-MIT-blue)
-![Status](https://img.shields.io/badge/Status-in%20progress-yellow)
+![Status](https://img.shields.io/badge/Status-playable-brightgreen)
 
 A terminal Texas Hold'em game built to **teach you the game**, not just simulate
 it — 6-max No-Limit cash game against AI opponents, with a live coach, guided
 lessons, an equity trainer, and post-hand review. Built with
 [Bubble Tea](https://github.com/charmbracelet/bubbletea).
 
-> **Status: under construction — not yet playable.** The full design lives in
-> [`docs/`](docs/) — start with [`docs/DESIGN.md`](docs/DESIGN.md).
+> **Status: playable.** You can deal hands against five AI opponents with a
+> live coach. Lessons and the trainer are not wired to the menu yet.
 >
 > | Package | State |
 > |---|---|
-> | `internal/engine` — betting, side pots, table lifecycle | ✅ done |
-> | `internal/eval` — 7-card evaluator (32 ns/op, 0 allocs) | ✅ done |
-> | `internal/ui` — theme, cards, seats, pot line | ✅ done |
-> | `internal/profile` — persistence | ✅ done |
-> | `internal/equity` — ranges, enumeration, outs | 🔨 in progress |
-> | `internal/app` — screens and navigation | 🔨 in progress |
-> | `internal/ai` — opponents and archetypes | ⬜ next |
-> | `internal/coach` — advice and grading | ⬜ next |
-> | `internal/tutorial`, `trainer`, `review` | ⬜ planned |
+> | `internal/engine` — betting, side pots, table lifecycle | ✅ |
+> | `internal/eval` — 7-card evaluator (32 ns/op, 0 allocs) | ✅ |
+> | `internal/equity` — ranges, exact enumeration, outs | ✅ |
+> | `internal/ai` — opponents, five archetypes | ✅ |
+> | `internal/coach` — advice, EV-loss grading, moments | ✅ |
+> | `internal/review` — post-hand replay | ✅ |
+> | `internal/tutorial` — 13-lesson curriculum | ✅ (screen pending) |
+> | `internal/app` — menus, table, hand review | ✅ |
+> | `internal/trainer` — standalone drills | ⬜ next |
 
 ## The idea
 
