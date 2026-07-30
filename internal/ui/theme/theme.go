@@ -19,10 +19,22 @@ type Theme struct {
 	// Cards
 	CardBorder, CardBack, CardWinner lipgloss.Style
 
+	// Hexagon table (docs/table-redesign-pitch-2.md, Direction E)
+	RingFrame lipgloss.Style // the drawn hexagon ring, felt green
+	RingDigit lipgloss.Style // engraved action-order digits, the rim's one saturated ink
+	SeatRead  lipgloss.Style // one-word archetype reads ("tight"), muted italic
+
 	// Panels & chrome
 	Header, Rule, StatusLine, Footer          lipgloss.Style
 	CoachBox, CoachTitle, GradeGood, GradeBad lipgloss.Style
 	ActionKeycap, ActionLabel, SizingSlider   lipgloss.Style
+
+	// Semantic action verbs (docs/table-redesign-pitch.md section 2.1).
+	// The Action* styles are the plain inks for inline mentions; the
+	// Button* styles are the filled treatment for action-bar caps
+	// (reverse video, so the fill adapts to any terminal background).
+	ActionFold, ActionCheck, ActionCall, ActionRaise, ActionAllIn lipgloss.Style
+	ButtonFold, ButtonCheck, ButtonCall, ButtonRaise, ButtonAllIn lipgloss.Style
 
 	// Menus / shared screens (euchre parity)
 	Title, Subtitle, Body, Help, ContentBox, ScreenBorder lipgloss.Style
@@ -55,6 +67,11 @@ func Default() *Theme {
 		CardBack:   lipgloss.NewStyle().Foreground(ColPip),
 		CardWinner: lipgloss.NewStyle().Foreground(ColGold).Bold(true),
 
+		// Hexagon table
+		RingFrame: lipgloss.NewStyle().Foreground(ColFelt),
+		RingDigit: lipgloss.NewStyle().Foreground(ColGold).Bold(true),
+		SeatRead:  lipgloss.NewStyle().Foreground(ColMuted).Italic(true),
+
 		// Panels & chrome
 		Header:     lipgloss.NewStyle().Foreground(ColText).Bold(true),
 		Rule:       lipgloss.NewStyle().Foreground(ColMuted),
@@ -72,6 +89,19 @@ func Default() *Theme {
 		ActionKeycap: lipgloss.NewStyle().Foreground(ColAccent).Bold(true),
 		ActionLabel:  lipgloss.NewStyle().Foreground(ColText),
 		SizingSlider: lipgloss.NewStyle().Foreground(ColAccent),
+
+		// Semantic action verbs
+		ActionFold:  lipgloss.NewStyle().Foreground(ColActionFold).Bold(true),
+		ActionCheck: lipgloss.NewStyle().Foreground(ColActionCheck).Bold(true),
+		ActionCall:  lipgloss.NewStyle().Foreground(ColActionCall).Bold(true),
+		ActionRaise: lipgloss.NewStyle().Foreground(ColActionRaise).Bold(true),
+		ActionAllIn: lipgloss.NewStyle().Foreground(ColActionAllIn).Bold(true),
+
+		ButtonFold:  lipgloss.NewStyle().Foreground(ColActionFold).Reverse(true).Bold(true),
+		ButtonCheck: lipgloss.NewStyle().Foreground(ColActionCheck).Reverse(true).Bold(true),
+		ButtonCall:  lipgloss.NewStyle().Foreground(ColActionCall).Reverse(true).Bold(true),
+		ButtonRaise: lipgloss.NewStyle().Foreground(ColActionRaise).Reverse(true).Bold(true),
+		ButtonAllIn: lipgloss.NewStyle().Foreground(ColActionAllIn).Reverse(true).Bold(true),
 
 		// Menus / shared screens
 		Title:    lipgloss.NewStyle().Foreground(ColAccent).Bold(true).MarginBottom(1),

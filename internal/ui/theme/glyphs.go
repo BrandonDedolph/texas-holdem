@@ -50,6 +50,20 @@ type Glyphs struct {
 	// worth repeating, Bad one that leaked, Query the middle band where the
 	// call was defensible but not the best available.
 	Good, Bad, Query string
+
+	// Hexagon ring frame pieces (the Direction E table), one cell each.
+	// The corners are rounded to match the mini-card frame; RingTeeL/RingTeeR
+	// are the junctions that fuse a seat plate's border into a ring line
+	// running along it; DiagUp and DiagDown are the slope-1 corner cuts
+	// (DiagUp rises left-to-right like /, DiagDown falls like \).
+	RingTL, RingTR, RingBL, RingBR, RingH, RingV, RingTeeL, RingTeeR string
+	DiagUp, DiagDown                                                 string
+
+	// Felt furniture, one cell each. Chip is a chip lying on the felt (pot
+	// and price piles); RaiseMark flags aggression next to a bet; FoldMark
+	// replaces a plate's action-order digit when the seat folds; ButtonFill
+	// is the fill cap of a colored action-bar button.
+	Chip, RaiseMark, FoldMark, ButtonFill string
 }
 
 // Unicode returns the full-fidelity glyph set.
@@ -95,6 +109,22 @@ func Unicode() Glyphs {
 		Good:  "✔",
 		Bad:   "✗",
 		Query: "?",
+
+		RingTL:   "╭",
+		RingTR:   "╮",
+		RingBL:   "╰",
+		RingBR:   "╯",
+		RingH:    "─",
+		RingV:    "│",
+		RingTeeL: "├",
+		RingTeeR: "┤",
+		DiagUp:   "╱",
+		DiagDown: "╲",
+
+		Chip:       "●",
+		RaiseMark:  "▲",
+		FoldMark:   "✗",
+		ButtonFill: "▓",
 	}
 }
 
@@ -143,6 +173,22 @@ func ASCII() Glyphs {
 		Good:  "+",
 		Bad:   "x",
 		Query: "?",
+
+		RingTL:   "+",
+		RingTR:   "+",
+		RingBL:   "+",
+		RingBR:   "+",
+		RingH:    "-",
+		RingV:    "|",
+		RingTeeL: "+",
+		RingTeeR: "+",
+		DiagUp:   "/",
+		DiagDown: "\\",
+
+		Chip:       "o",
+		RaiseMark:  "^",
+		FoldMark:   "x",
+		ButtonFill: "#",
 	}
 }
 
