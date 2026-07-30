@@ -65,12 +65,17 @@ func (c Card) Suit() Suit { return Suit(c & 3) }
 // Valid reports whether c is within the 52-card range.
 func (c Card) Valid() bool { return c < NumCards }
 
+// rankLetters is the single-byte input alphabet: parsing accepts "T" for
+// Ten (and "10" via the parse functions), but display always uses Symbol.
 const rankLetters = "23456789TJQKA"
 
 var (
 	suitGlyphs  = [NumSuits]string{"♣", "♦", "♥", "♠"}
 	suitLetters = [NumSuits]string{"c", "d", "h", "s"}
-	rankNames   = [NumRanks]string{
+	rankSymbols = [NumRanks]string{
+		"2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A",
+	}
+	rankNames = [NumRanks]string{
 		"Two", "Three", "Four", "Five", "Six", "Seven", "Eight",
 		"Nine", "Ten", "Jack", "Queen", "King", "Ace",
 	}
@@ -80,8 +85,16 @@ var (
 	}
 )
 
-// Letter is the single-character form of a rank ("T" for Ten).
-func (r Rank) Letter() byte { return rankLetters[r] }
+// Symbol is the display form of a rank: "2".."9", "10", "J", "Q", "K", "A".
+// The Ten is the one two-character symbol — the owner's decision is that a
+// ten always shows as "10", never "T" (though "T" is still accepted on
+// input by the parse functions).
+func (r Rank) Symbol() string {
+	if r >= NumRanks {
+		return "?"
+	}
+	return rankSymbols[r]
+}
 
 // String is the English name of a rank ("Ace").
 func (r Rank) String() string {
@@ -115,25 +128,27 @@ func (s Suit) String() string {
 	return suitLetters[s]
 }
 
-// String is the display form of a card: "A♠", "T♦".
+// String is the display form of a card: "A♠", "10♦".
 func (c Card) String() string {
 	if !c.Valid() {
 		return "??"
 	}
-	return string(c.Rank().Letter()) + c.Suit().Glyph()
+	return c.Rank().Symbol() + c.Suit().Glyph()
 }
 
-// Code is the canonical two-character form: "As", "Td". This is the notation
-// used in tests, lesson content, and hand histories.
+// Code is the canonical code form: "As", "10d" — two characters, three for
+// tens. This is the notation used in tests, lesson content, and hand
+// histories. Parsing accepts both "10d" and the legacy "Td" so existing
+// content and histories still load; output is always the "10" form.
 func (c Card) Code() string {
 	if !c.Valid() {
 		return "??"
 	}
-	return string(c.Rank().Letter()) + c.Suit().String()
+	return c.Rank().Symbol() + c.Suit().String()
 }
 
-// ParseRank parses a single rank character. It accepts "10" only via
-// ParseCard; here a rank is exactly one byte.
+// ParseRank parses a single rank character ("T" for Ten). It accepts "10"
+// only via ParseCard; here a rank is exactly one byte.
 func ParseRank(b byte) (Rank, error) {
 	if b >= 'a' && b <= 'z' {
 		b -= 'a' - 'A'
@@ -191,7 +206,8 @@ func MustCard(s string) Card {
 }
 
 // ParseCards parses a whitespace-separated list ("As Kd 7h") or a run of
-// two-character codes ("AsKd7h"). Glyph forms require whitespace separation.
+// codes ("AsKd7h"); tens may be written "10d" or "Td" in either form.
+// Glyph forms require whitespace separation.
 func ParseCards(s string) ([]Card, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -208,7 +224,11 @@ func ParseCards(s string) ([]Card, error) {
 		}
 		return out, nil
 	}
-	// Single token: either one card or a run of two-character codes.
+	// Single token: either one card or a run of two-character codes. "10"
+	// can only ever be the digram "1","0" — no rank or suit uses either
+	// byte — so folding it to the input alias "T" first lets ten-bearing
+	// runs ("As10d7h") split on the two-byte grid.
+	s = strings.ReplaceAll(s, "10", "T")
 	if len([]rune(s)) <= 2 {
 		c, err := ParseCard(s)
 		if err != nil {

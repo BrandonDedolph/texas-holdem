@@ -74,6 +74,11 @@ func (r *Range) addTerm(term string, scale float32) error {
 		term = term[end+1:]
 	}
 	w *= scale
+	// Ranks display as "10" now, so class notation arrives in both forms:
+	// "A10s" and the legacy "ATs". The digram "10" can only be the ten (no
+	// rank or suit byte is '1' or '0' once the weight prefix is gone), so
+	// folding it to the single-byte alias keeps the class parser fixed-width.
+	term = strings.ReplaceAll(term, "10", "T")
 	combos, err := expandTerm(term)
 	if err != nil {
 		return err
@@ -261,7 +266,7 @@ func isSuitByte(b byte) bool {
 }
 
 // String re-serializes the range canonically: pair cells first (merged into
-// "QQ+" / "99-66" runs), then suited cells by first rank ("ATs+",
+// "QQ+" / "99-66" runs), then suited cells by first rank ("A10s+",
 // "A9s-A5s"), then offsuit, then any combo that is not part of a uniformly
 // weighted cell, as an exact term. Non-unit weights get a "[NN]" prefix,
 // quantized to whole percent — which is lossless for anything ParseRange
@@ -292,7 +297,7 @@ func (r Range) String() string {
 		}
 		terms = append(terms, term)
 	}
-	letter := func(rk engine.Rank) string { return string(rk.Letter()) }
+	letter := func(rk engine.Rank) string { return rk.Symbol() }
 
 	// Pairs, Ace down, merged into runs of equal weight.
 	for hi := int(engine.Ace); hi >= 0; hi-- {

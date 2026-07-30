@@ -43,7 +43,7 @@ func TestGlyphWidthParity(t *testing.T) {
 }
 
 // TestSuitGlyphsSingleCell pins the risk flagged in docs/DESIGN.md section 4:
-// the 4x3 mini card assumes the suit symbols render one cell wide under
+// the 5x3 mini card assumes the suit symbols render one cell wide under
 // lipgloss.Width. If this fails, the ASCII set is the escape hatch.
 func TestSuitGlyphsSingleCell(t *testing.T) {
 	u := Unicode()

@@ -77,14 +77,14 @@ func init() {
 			{
 				Kind: tutorial.SectionDrill,
 				Drill: &tutorial.Drill{
-					Prompt: "Board: 7c 8d 9h Tc Js — a jack-high straight on the board. " +
+					Prompt: "Board: 7c 8d 9h 10c Js — a jack-high straight on the board. " +
 						"Player A holds Ad 2c. Player B holds Kh 3d. Who wins?",
 					Answer: tutorial.ChoiceAnswer{
 						Choices: []string{"Player A", "Player B", "Split pot"},
 						Correct: 2,
 					},
 					Explain: "Neither hole card improves the board's straight — an ace or " +
-						"a king doesn't extend 7-8-9-T-J (only a queen would, by making a " +
+						"a king doesn't extend 7-8-9-10-J (only a queen would, by making a " +
 						"queen-high straight). Both players play the board and split. The " +
 						"ace is doing nothing; five cards, best five, every time.",
 					Fact: tutorial.WinnerFact{

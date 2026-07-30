@@ -116,6 +116,12 @@ func TestRangeGridCellLabels(t *testing.T) {
 		{12, 12, "22"},
 		{0, 12, "A2s"},
 		{12, 0, "A2o"},
+		// The ten's cells carry the wide "10" labels — the owner's decision.
+		{4, 4, "1010"},
+		{0, 4, "A10s"},
+		{4, 0, "A10o"},
+		{4, 5, "109s"},
+		{5, 4, "109o"},
 	}
 	for _, tc := range cases {
 		if got := cellLabel(tc.row, tc.col); got != tc.want {

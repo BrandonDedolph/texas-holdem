@@ -84,11 +84,11 @@ func init() {
 				Kind: tutorial.SectionDrill,
 				Drill: &tutorial.Drill{
 					Prompt: "Order these five-card hands from strongest to weakest:\n" +
-						"  1. Ad Td 8d 6d 3d\n" +
+						"  1. Ad 10d 8d 6d 3d\n" +
 						"  2. Kc Kh Kd 4s 4d\n" +
 						"  3. 9c 8d 7h 6s 5c",
 					Answer: tutorial.OrderAnswer{
-						Items:   []string{"Ad Td 8d 6d 3d", "Kc Kh Kd 4s 4d", "9c 8d 7h 6s 5c"},
+						Items:   []string{"Ad 10d 8d 6d 3d", "Kc Kh Kd 4s 4d", "9c 8d 7h 6s 5c"},
 						Correct: []int{1, 0, 2},
 					},
 					Explain: "Full house (kings full of fours) beats flush (ace-high), " +

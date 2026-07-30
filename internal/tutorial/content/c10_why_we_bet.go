@@ -68,7 +68,7 @@ func init() {
 			{
 				Kind: tutorial.SectionDrill,
 				Drill: &tutorial.Drill{
-					Prompt: "You raised with Ac 5c and the flop comes Jh Th 9s — low- " +
+					Prompt: "You raised with Ac 5c and the flop comes Jh 10h 9s — low- " +
 						"and-middle straight-and-flush city, and it smashed your " +
 						"opponent's calling range. Best default?",
 					Answer: tutorial.ChoiceAnswer{

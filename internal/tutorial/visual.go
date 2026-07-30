@@ -122,11 +122,19 @@ type VisualRangeGrid struct {
 	Title string // e.g. "Button opening range (~42%)"
 }
 
-// Render implements the visual. Thirteen rows of thirteen 3-character cells
-// plus separators: 52 columns, comfortably inside 80.
+// rangeGridFullWidth is the grid with one-column gaps: thirteen 4-character
+// cells (the ten's labels — "1010", "A10s", "109o" — are the wide ones,
+// per the owner's "10, never T" decision) plus twelve separators.
+const rangeGridFullWidth = 13*4 + 12 // 64 columns, inside the 80-col floor
+
+// Render implements the visual. At full width the cells get one-column
+// gaps (64 columns); when the caller's budget is narrower — the 60-column
+// compact floor — the gaps are dropped and the packed 52-column grid still
+// fits without clipping a cell.
 func (g *VisualRangeGrid) Render(width int) string {
 	grid := g.Range.Grid()
 	th := theme.Current
+	gap := width <= 0 || width >= rangeGridFullWidth
 	var out []string
 	if g.Title != "" {
 		out = append(out, th.Header.Render(clipTo(g.Title, width)))
@@ -142,8 +150,8 @@ func (g *VisualRangeGrid) Render(width int) string {
 			case w > 0:
 				style = th.Subtitle
 			}
-			b.WriteString(style.Render(fmt.Sprintf("%-3s", label)))
-			if col < 12 {
+			b.WriteString(style.Render(fmt.Sprintf("%-4s", label)))
+			if gap && col < 12 {
 				b.WriteByte(' ')
 			}
 		}
@@ -153,17 +161,19 @@ func (g *VisualRangeGrid) Render(width int) string {
 }
 
 // cellLabel names a grid cell: "AA" on the diagonal, "AKs" above it, "AKo"
-// below, matching every published range chart.
+// below. Published charts write the ten as "T"; this app writes "10"
+// everywhere by the owner's decision, so the ten's cells read "1010",
+// "A10s", "109o" and the grid pays for it with a wider column.
 func cellLabel(row, col int) string {
 	r1 := engine.Rank(12 - row)
 	r2 := engine.Rank(12 - col)
 	switch {
 	case row == col:
-		return string(r1.Letter()) + string(r1.Letter())
+		return r1.Symbol() + r1.Symbol()
 	case row < col:
-		return string(r1.Letter()) + string(r2.Letter()) + "s"
+		return r1.Symbol() + r2.Symbol() + "s"
 	default:
-		return string(r2.Letter()) + string(r1.Letter()) + "o"
+		return r2.Symbol() + r1.Symbol() + "o"
 	}
 }
 
