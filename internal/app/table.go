@@ -134,6 +134,21 @@ type TableScreen struct {
 	// The coach runs the same strategy the opponents do (DESIGN.md §1) — it
 	// is the TAG preset in the hero's seat. advice is frozen when the hero's
 	// turn begins; grades are frozen when they act and never revised.
+	// prof is the player's persisted profile. The table writes to it as the
+	// session runs — grades, moments, and the session summary — and saves,
+	// so progress survives a quit rather than living only in memory.
+	prof *profile.Profile
+
+	// session accumulates this sitting's headline numbers for the profile's
+	// SessionLog. Decision accuracy and net chips are tracked side by side
+	// deliberately: the menu shows both, and watching them diverge is the
+	// variance lesson (DESIGN.md §1).
+	sessionStart               time.Time
+	sessionHands               int
+	sessionNet                 engine.Chips
+	sessionGraded, sessionGood int
+	sessionEVLossBB            float64
+
 	coach     *coach.Coach
 	advice    *coach.Advice
 	lastGrade *coach.GradedDecision
@@ -218,14 +233,16 @@ func newTableScreen(cfg TableConfig, prefs *Prefs, prof *profile.Profile, stacks
 	eng.Eval = eval.Evaluator
 
 	m := &TableScreen{
-		cfg:       cfg,
-		prefs:     prefs,
-		eng:       eng,
-		opponents: opps,
-		bar:       NewActionBar(),
-		coachMode: cfg.CoachMode,
-		speed:     cfg.Speed,
-		coach:     coach.New(prof, coachSeed),
+		cfg:          cfg,
+		prefs:        prefs,
+		eng:          eng,
+		opponents:    opps,
+		bar:          NewActionBar(),
+		coachMode:    cfg.CoachMode,
+		speed:        cfg.Speed,
+		prof:         prof,
+		sessionStart: time.Now().UTC(),
+		coach:        coach.New(prof, coachSeed),
 	}
 	if stacks[heroSeat] > 0 {
 		must(eng.Sit(heroSeat, heroName, stacks[heroSeat]))
@@ -530,7 +547,26 @@ func (m *TableScreen) applyStep(st step) {
 // state. The completed Hand object stays around for rendering and review.
 func (m *TableScreen) finishHand() {
 	if m.hand != nil && m.hand.Phase() == engine.PhaseComplete {
+		if res, ok := m.hand.Result(); ok {
+			m.sessionNet += res.Net[heroSeat]
+		}
 		_ = m.eng.FinishHand(m.hand)
+		m.sessionHands++
+		for _, g := range m.grades {
+			m.sessionGraded++
+			if g.Grade.GoodOrBetter() {
+				m.sessionGood++
+			}
+			m.sessionEVLossBB += g.EVLossBB
+		}
+		// Persist once per hand rather than per decision: grades and any
+		// teachable moments shown during the hand are recorded on the
+		// profile by then, and a hand boundary is the natural checkpoint.
+		// Best-effort, like everywhere else — a broken disk must not
+		// interrupt play.
+		if m.prof != nil {
+			_ = m.prof.Save()
+		}
 	}
 	m.handDone = true
 	m.bar.Wait()
@@ -923,4 +959,33 @@ func (m *TableScreen) heroAct(a engine.Action) tea.Cmd {
 	m.bar.Wait()
 	m.ingestEvents()
 	return m.advanceQueue()
+}
+
+// RecordSession appends this sitting to the profile's SessionLog and saves.
+// Called when the player leaves the table for good.
+//
+// The menu reads SessionLog to say "last session · 38 hands"; until this
+// existed the log was read by the UI and written by nothing, so the signpost
+// could never appear. A session with no hands is not worth recording — it
+// would push a real session out of the "most recent" slot with nothing.
+func (m *TableScreen) RecordSession() {
+	if m == nil || m.prof == nil || m.sessionHands == 0 {
+		return
+	}
+	accuracy := 0.0
+	if m.sessionGraded > 0 {
+		accuracy = float64(m.sessionGood) / float64(m.sessionGraded)
+	}
+	netBB := 0.0
+	if m.cfg.BigBlind > 0 {
+		netBB = float64(m.sessionNet) / float64(m.cfg.BigBlind)
+	}
+	m.prof.SessionLog = append(m.prof.SessionLog, profile.SessionSummary{
+		Start:    m.sessionStart,
+		Hands:    m.sessionHands,
+		NetBB:    netBB,
+		Accuracy: accuracy,
+		EVLossBB: m.sessionEVLossBB,
+	})
+	_ = m.prof.Save()
 }

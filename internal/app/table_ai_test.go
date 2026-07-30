@@ -141,3 +141,58 @@ func TestSetupArchetypesMatchTheAIRegistry(t *testing.T) {
 		}
 	}
 }
+
+// TestSessionIsRecordedForTheMenu closes the loop between playing and the
+// main menu's signposting. SessionLog was read by the menu and written by
+// nothing, so "last session · N hands" could never appear however much you
+// played.
+func TestSessionIsRecordedForTheMenu(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	prof := profile.NewProfile()
+
+	cfg := TableConfig{
+		SmallBlind: 5, BigBlind: 10, Stack: 1000,
+		Lineup: ClassroomLineup(), CoachMode: CoachFull, Speed: SpeedInstant,
+	}
+	var m tea.Model = NewTableScreen(cfg, DefaultPrefs(), prof)
+	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m.Init()
+	for i := 0; i < 60; i++ {
+		m = driveKeys(m, "f", " ", "\r")
+	}
+	ts := m.(*TableScreen)
+	if ts.sessionHands == 0 {
+		t.Fatal("no hands completed in 60 iterations")
+	}
+	ts.RecordSession()
+
+	if len(prof.SessionLog) != 1 {
+		t.Fatalf("SessionLog has %d entries, want 1", len(prof.SessionLog))
+	}
+	got := prof.SessionLog[0]
+	if got.Hands != ts.sessionHands {
+		t.Errorf("recorded %d hands, played %d", got.Hands, ts.sessionHands)
+	}
+	if got.Accuracy < 0 || got.Accuracy > 1 {
+		t.Errorf("accuracy %v is not a fraction", got.Accuracy)
+	}
+	if got.EVLossBB < 0 {
+		t.Errorf("EV loss %v is negative", got.EVLossBB)
+	}
+	if got.Start.IsZero() {
+		t.Error("session start not recorded")
+	}
+}
+
+// TestEmptySessionIsNotRecorded: opening the table and leaving without
+// playing must not push a real session out of the "most recent" slot.
+func TestEmptySessionIsNotRecorded(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	prof := profile.NewProfile()
+	ts := NewTableScreen(TableConfig{SmallBlind: 5, BigBlind: 10, Stack: 1000,
+		Speed: SpeedInstant}, DefaultPrefs(), prof)
+	ts.RecordSession()
+	if len(prof.SessionLog) != 0 {
+		t.Errorf("an unplayed session was recorded: %+v", prof.SessionLog)
+	}
+}

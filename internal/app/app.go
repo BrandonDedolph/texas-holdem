@@ -109,8 +109,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a.navigate(msg.Screen, msg.Data)
 
 	case EndSessionMsg:
-		// The session is over: drop the cached table, and the review screen
-		// with it — a review of a dropped session would be stale.
+		// The session is over: record it before dropping the table, then drop
+		// the review screen with it — a review of a dropped session is stale.
+		if t, ok := a.models[ScreenTable].(*TableScreen); ok {
+			t.RecordSession()
+		}
 		delete(a.models, ScreenTable)
 		delete(a.models, ScreenHandReview)
 		return a.navigate(ScreenMainMenu, nil)
