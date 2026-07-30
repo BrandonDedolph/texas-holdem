@@ -75,15 +75,15 @@ func genEquityHand(rng *rand.Rand, tag string) (Item, bool) {
 	heroStr := engine.CardsString(shape.hero[:])
 	villainStr := engine.CardsString(shape.villain[:])
 	boardStr := engine.CardsString(board)
-	prompt := "Villain shows " + villainStr + " (" +
-		eval.EvalHoldem(shape.villain, board).Describe() + "). Estimate your equity (%)."
+	// The villain's cards are drawn in the visual; the prompt names only
+	// the made hand, straight from the evaluator.
+	prompt := "Villain shows " + eval.EvalHoldem(shape.villain, board).Describe() +
+		". Estimate your equity (%)."
 
 	return Item{
 		Drill: tutorial.Drill{
-			Prompt: prompt,
-			Visual: &tutorial.Visual{Board: &tutorial.VisualBoard{
-				Board: board, Hole: shape.hero, ShowHole: true,
-			}},
+			Prompt:  prompt,
+			Visual:  drawVisual(shape.hero, board, &shape.villain),
 			Answer:  tutorial.NumericAnswer{Value: math.Round(pct), Tolerance: equityTolerance},
 			Explain: equityExplain(report, res, len(board)),
 			Fact:    tutorial.EquityFact{Hero: heroStr, Villain: villainStr, Board: boardStr, Within: 1},
@@ -130,10 +130,8 @@ func genEquityRange(rng *rand.Rand) (Item, bool) {
 
 	return Item{
 		Drill: tutorial.Drill{
-			Prompt: prompt,
-			Visual: &tutorial.Visual{Board: &tutorial.VisualBoard{
-				Board: shape.board, Hole: shape.hero, ShowHole: true,
-			}},
+			Prompt:  prompt,
+			Visual:  drawVisual(shape.hero, shape.board, nil),
 			Answer:  tutorial.NumericAnswer{Value: math.Round(pct), Tolerance: equityTolerance},
 			Explain: equityExplain(report, res, len(shape.board)),
 			Fact:    tutorial.EquityFact{Hero: heroStr, VillainRange: named.spec, Board: boardStr, Within: 1},

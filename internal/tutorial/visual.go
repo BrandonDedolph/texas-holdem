@@ -2,6 +2,7 @@ package tutorial
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -18,6 +19,7 @@ import (
 // glyphs via theme — so lesson visuals look identical to the live table.
 type Visual struct {
 	Board      *VisualBoard
+	Showdown   *VisualShowdown
 	RangeGrid  *VisualRangeGrid
 	TableSeats *VisualTableSeats
 	HandLadder *VisualHandLadder
@@ -28,12 +30,23 @@ type Visual struct {
 
 // Render draws the visual within width columns. Every visual fits 80
 // columns (the app's floor); narrower widths clip captions but never wrap
-// the diagram.
-func (v *Visual) Render(width int) string {
+// the diagram. Card visuals draw the full-size study card; height-starved
+// callers use RenderCompact instead.
+func (v *Visual) Render(width int) string { return v.render(width, false) }
+
+// RenderCompact is Render with the card visuals in their 3-row mini form —
+// for the 60x20 compact breakpoint, where a 5-row card plus its label rows
+// would not leave room for the question under it. The non-card visuals are
+// already text-height and render identically.
+func (v *Visual) RenderCompact(width int) string { return v.render(width, true) }
+
+func (v *Visual) render(width int, compact bool) string {
 	var body string
 	switch {
 	case v.Board != nil:
-		body = v.Board.Render(width)
+		body = v.Board.render(width, compact)
+	case v.Showdown != nil:
+		body = v.Showdown.render(width, compact)
 	case v.RangeGrid != nil:
 		body = v.RangeGrid.Render(width)
 	case v.TableSeats != nil:
@@ -46,9 +59,92 @@ func (v *Visual) Render(width int) string {
 		return ""
 	}
 	if v.Caption != "" {
-		body += "\n" + theme.Current.Subtitle.Render(clipTo(v.Caption, width))
+		body += "\n" + ColorizeCards(clipTo(v.Caption, width), theme.Current.Subtitle)
 	}
 	return body
+}
+
+// --- The full-size study card ---------------------------------------------------
+//
+// Two card sizes exist on purpose. The table screen keeps the 5x3 mini card:
+// its seat ring already spends 13 of 24 rows, and 5-row cards would cost
+// roughly four more rows between the board and the hero's hand, which that
+// layout cannot pay. Lessons and the trainer exist to LOOK at cards, have
+// the rows to spare, and so draw this full 7x5 card — rank in the top-left
+// index, suit pip centred, rank mirrored bottom-right, like a real card
+// (the euchre project's card, which the owner asked for). Glanceable on the
+// table, a full card when the card itself is the subject.
+//
+// TODO(promote): this renderer belongs in internal/ui/components next to
+// MiniCard; it lives here for now because this change does not own that
+// package. Two theme gaps worth closing at promotion time: the palette has
+// no card-face background (euchre paints a white card body; we render suit
+// ink on the terminal background), and glyphs.go has no double-border set
+// (euchre's emphasis border; we emphasise with the CardWinner gold ink the
+// table's showdown already uses).
+
+// Full-card geometry: every full card is exactly FullCardWidth cells wide
+// and FullCardHeight rows tall. The interior is five cells, sized for the
+// two-character "10" rank plus breathing room.
+const (
+	FullCardWidth  = 7
+	FullCardHeight = 5
+
+	fullInterior = FullCardWidth - 2
+)
+
+// FullCard renders the 7x5 study card. highlight swaps the frame to the
+// CardWinner style — the emphasis form for "these five play".
+func FullCard(c engine.Card, highlight bool) string {
+	g := theme.G
+	border := theme.Current.CardBorder
+	if highlight {
+		border = theme.Current.CardWinner
+	}
+	rank := c.Rank().Symbol()
+	suit := theme.SuitGlyph(c.Suit())
+	ink := theme.SuitStyle(c.Suit())
+	pad := strings.Repeat(" ", fullInterior-lipgloss.Width(rank))
+	mid := strings.Repeat(" ", (fullInterior-1)/2)
+	rows := []string{
+		border.Render(g.CardTL + strings.Repeat(g.CardH, fullInterior) + g.CardTR),
+		border.Render(g.CardVL) + ink.Render(rank+pad) + border.Render(g.CardVR),
+		border.Render(g.CardVL) + ink.Render(mid+suit+mid) + border.Render(g.CardVR),
+		border.Render(g.CardVL) + ink.Render(pad+rank) + border.Render(g.CardVR),
+		border.Render(g.CardBL + strings.Repeat(g.CardH, fullInterior) + g.CardBR),
+	}
+	return strings.Join(rows, "\n")
+}
+
+// fullPlaceholder is an undealt board slot at full-card size: a dim pip in
+// the box a future card will fill, so the board's width never changes as
+// streets arrive.
+func fullPlaceholder() string {
+	blank := strings.Repeat(" ", FullCardWidth)
+	mid := strings.Repeat(" ", (FullCardWidth-1)/2)
+	pip := mid + theme.Current.BoardPlaceholder.Render(theme.G.Dot) + mid
+	return strings.Join([]string{blank, blank, pip, blank, blank}, "\n")
+}
+
+// fullBoardRow renders the community board as five full-size slots.
+// highlight marks cards to draw in the emphasis frame; nil highlights none.
+func fullBoardRow(dealt []engine.Card, highlight engine.CardSet) string {
+	slots := make([]string, components.BoardSlots)
+	for i := range slots {
+		if i < len(dealt) {
+			slots[i] = FullCard(dealt[i], highlight.Has(dealt[i]))
+		} else {
+			slots[i] = fullPlaceholder()
+		}
+	}
+	return joinBlocks(" ", slots...)
+}
+
+// fullHand renders a two-card holding side by side at full size.
+func fullHand(hole [2]engine.Card, highlight engine.CardSet) string {
+	return joinBlocks(" ",
+		FullCard(hole[0], highlight.Has(hole[0])),
+		FullCard(hole[1], highlight.Has(hole[1])))
 }
 
 // VisualBoard shows community cards, optionally the hero's hole cards, and
@@ -61,21 +157,94 @@ type VisualBoard struct {
 	ShowBest bool // annotate Best5(hole, board); requires ShowHole and ≥3 board cards
 }
 
-// Render implements the visual.
-func (b *VisualBoard) Render(width int) string {
+// Render implements the visual at full-card size.
+func (b *VisualBoard) Render(width int) string { return b.render(width, false) }
+
+func (b *VisualBoard) render(width int, compact bool) string {
+	var best engine.CardSet
+	var bestLine string
+	if b.ShowBest && b.ShowHole && len(b.Board) >= 3 {
+		rank, five := eval.Best5(b.Hole, b.Board)
+		best = engine.NewCardSet(five[:]...)
+		bestLine = clipTo("Best five: "+inlineCards(five[:])+"  "+
+			theme.Current.GradeGood.Render(rank.Describe()), width)
+	}
 	var out []string
 	out = append(out, theme.Current.Body.Render("Board"))
-	out = append(out, components.BoardRow(b.Board))
+	if compact {
+		out = append(out, components.BoardRow(b.Board))
+	} else {
+		out = append(out, fullBoardRow(b.Board, best))
+	}
 	if b.ShowHole {
 		out = append(out, theme.Current.Body.Render("Your hand"))
-		out = append(out, joinBlocks(" ", components.MiniCard(b.Hole[0]), components.MiniCard(b.Hole[1])))
+		if compact {
+			out = append(out, joinBlocks(" ", components.MiniCard(b.Hole[0]), components.MiniCard(b.Hole[1])))
+		} else {
+			out = append(out, fullHand(b.Hole, best))
+		}
 	}
-	if b.ShowBest && b.ShowHole && len(b.Board) >= 3 {
-		rank, best := eval.Best5(b.Hole, b.Board)
-		line := "Best five: " + inlineCards(best[:]) + "  " +
-			theme.Current.GradeGood.Render(rank.Describe())
-		out = append(out, clipTo(line, width))
+	if bestLine != "" {
+		out = append(out, bestLine)
 	}
+	return strings.Join(out, "\n")
+}
+
+// ShownHand is one labelled holding in a VisualShowdown. The label names
+// whose cards these are ("Player A", "Villain") — a comparison the learner
+// cannot attribute at a glance teaches nothing.
+type ShownHand struct {
+	Label string
+	Hole  [2]engine.Card
+}
+
+// VisualShowdown is the head-to-head diagram: an optional board plus two or
+// more labelled hands drawn as cards. It exists because VisualBoard shows
+// one holding, and a "who wins?" drill has to show several, each visibly
+// owned.
+type VisualShowdown struct {
+	Board []engine.Card // empty for a preflop matchup
+	Hands []ShownHand
+}
+
+// showdownGutter separates hand blocks; wide enough to read as separate
+// hands, narrow enough that two full-size hands sit inside the 60-column
+// compact floor.
+const showdownGutter = "   "
+
+// Render implements the visual at full-card size.
+func (s *VisualShowdown) Render(width int) string { return s.render(width, false) }
+
+func (s *VisualShowdown) render(width int, compact bool) string {
+	cardW, hand := FullCardWidth, fullHand
+	boardRow := func(b []engine.Card) string { return fullBoardRow(b, 0) }
+	if compact {
+		cardW = components.MiniCardWidth
+		hand = func(hole [2]engine.Card, _ engine.CardSet) string {
+			return joinBlocks(" ", components.MiniCard(hole[0]), components.MiniCard(hole[1]))
+		}
+		boardRow = components.BoardRow
+	}
+	blockWidth := 2*cardW + 1
+
+	var out []string
+	if len(s.Board) > 0 {
+		out = append(out, theme.Current.Body.Render("Board"))
+		out = append(out, boardRow(s.Board))
+	}
+	labels := make([]string, len(s.Hands))
+	blocks := make([]string, len(s.Hands))
+	for i, h := range s.Hands {
+		label := clipTo(h.Label, blockWidth)
+		gap := blockWidth - lipgloss.Width(label)
+		if gap < 0 {
+			gap = 0
+		}
+		labels[i] = theme.Current.Body.Render(label) + strings.Repeat(" ", gap)
+		blocks[i] = hand(h.Hole, 0)
+	}
+	out = append(out, strings.Join(labels, showdownGutter))
+	out = append(out, joinBlocks(showdownGutter, blocks...))
 	return strings.Join(out, "\n")
 }
 
@@ -307,6 +476,55 @@ func (p *VisualPotOdds) Render(width int) string {
 		rows[i] = clipTo(r, width)
 	}
 	return strings.Join(rows, "\n")
+}
+
+// cardCodeRE matches one or two concatenated card codes standing alone as a
+// word: "As", "10d", and range-spec combos like "9c8c". Hand-class notation
+// ("A5s", "K9s+", "A10s+") never matches — there the rank-plus-suit pair is
+// glued to other word characters, so the \b anchors fail. The legacy "T"
+// rank is deliberately absent: rendered text always spells the ten "10".
+var cardCodeRE = regexp.MustCompile(`\b((?:10|[2-9AKQJ])[cdhs])((?:10|[2-9AKQJ])[cdhs])?\b`)
+
+// ColorizeCards renders a prose line with every card code drawn through the
+// shared inline-card component — coloured, suited, "10" for the ten — and
+// everything else in base. Lesson prose, drill explanations and trainer
+// prompts route through this so a sentence's "4c" looks exactly like the 4c
+// on the table, not like a bare code the learner must decode. Each card
+// keeps its plain-text cell width (the suit glyph is one cell, like the
+// letter it replaces), so wrapping computed before colorizing stays valid.
+func ColorizeCards(s string, base lipgloss.Style) string {
+	ms := cardCodeRE.FindAllStringSubmatchIndex(s, -1)
+	if len(ms) == 0 {
+		return base.Render(s)
+	}
+	var b strings.Builder
+	last := 0
+	for _, m := range ms {
+		if m[0] > last {
+			b.WriteString(base.Render(s[last:m[0]]))
+		}
+		for _, g := range [][2]int{{m[2], m[3]}, {m[4], m[5]}} {
+			if g[0] >= 0 {
+				b.WriteString(inlineCode(s[g[0]:g[1]]))
+			}
+		}
+		last = m[1]
+	}
+	if last < len(s) {
+		b.WriteString(base.Render(s[last:]))
+	}
+	return b.String()
+}
+
+// inlineCode renders one card code through InlineCard, falling back to the
+// raw text if it does not parse (the regex guarantees the shape, so the
+// fallback is belt and braces).
+func inlineCode(code string) string {
+	cards, err := engine.ParseCards(code)
+	if err != nil || len(cards) != 1 {
+		return code
+	}
+	return components.InlineCard(cards[0])
 }
 
 // clipTo truncates a (possibly styled) line to width display cells. Styled

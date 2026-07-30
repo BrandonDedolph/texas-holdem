@@ -72,8 +72,10 @@ func chromeScreens(t *testing.T) map[string]tea.Model {
 }
 
 // borderRunRE matches a rounded-border top edge of meaningful length: a
-// screen or box frame, but not a mini card (whose top is only two dashes).
-var borderRunRE = regexp.MustCompile(`╭─{5,}`)
+// screen or box frame, but not a card — the table's mini card tops out at
+// three dashes and the lesson/trainer study card at five, while any real
+// frame spans tens of cells.
+var borderRunRE = regexp.MustCompile(`╭─{8,}`)
 
 func TestContentScreensShareTheChrome(t *testing.T) {
 	for name, m := range chromeScreens(t) {

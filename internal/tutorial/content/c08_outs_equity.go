@@ -48,8 +48,15 @@ func init() {
 			{
 				Kind: tutorial.SectionDrill,
 				Drill: &tutorial.Drill{
-					Prompt: "You hold 9s 8s on a board of As Ks 2h. How many clean outs " +
-						"do you have? (exact)",
+					Prompt: "Four spades, needing one more. How many clean outs do you " +
+						"have? (exact)",
+					Visual: &tutorial.Visual{
+						Board: &tutorial.VisualBoard{
+							Board:    engine.MustCards("As Ks 2h"),
+							Hole:     engine.Holes("9s 8s"),
+							ShowHole: true,
+						},
+					},
 					Answer: tutorial.NumericAnswer{Value: 9},
 					Explain: "Nine — the remaining spades. Note what you DON'T count: " +
 						"pairing your 9 or 8 doesn't help, because a pair of nines still " +
@@ -77,9 +84,18 @@ func init() {
 			{
 				Kind: tutorial.SectionDrill,
 				Drill: &tutorial.Drill{
-					Prompt: "Same spot — 9s 8s on As Ks 2h, flush draw, flop, opponent " +
-						"has top pair with Ad Qd. Use the rule of 4: about what percent " +
-						"do you win? (within 5)",
+					Prompt: "Same flush draw on the flop, but now the opponent shows " +
+						"top pair. Use the rule of 4: about what percent do you win? " +
+						"(within 5)",
+					Visual: &tutorial.Visual{
+						Showdown: &tutorial.VisualShowdown{
+							Board: engine.MustCards("As Ks 2h"),
+							Hands: []tutorial.ShownHand{
+								{Label: "You", Hole: engine.Holes("9s 8s")},
+								{Label: "Opponent", Hole: engine.Holes("Ad Qd")},
+							},
+						},
+					},
 					Answer: tutorial.NumericAnswer{Value: 36, Tolerance: 5},
 					Explain: "9 outs × 4 ≈ 36%; the exact enumeration says 37%. That's " +
 						"the whole trick — a one-digit multiplication lands within a " +

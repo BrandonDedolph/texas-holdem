@@ -149,8 +149,16 @@ func rankingsItem(tag string, left, right [2]engine.Card, board []engine.Card, l
 
 	return Item{
 		Drill: tutorial.Drill{
-			Prompt: "Who wins at showdown?\nLeft: " + leftStr + "   Right: " + rightStr,
-			Visual: &tutorial.Visual{Board: &tutorial.VisualBoard{Board: board}},
+			Prompt: "Who wins at showdown?",
+			// The hands are the question, so they are drawn as cards under
+			// their own labels — never spelled as codes in the prompt.
+			Visual: &tutorial.Visual{Showdown: &tutorial.VisualShowdown{
+				Board: board,
+				Hands: []tutorial.ShownHand{
+					{Label: "Left", Hole: left},
+					{Label: "Right", Hole: right},
+				},
+			}},
 			Answer: tutorial.ChoiceAnswer{
 				Choices: []string{"Left", "Right", "Split"},
 				Correct: correct,

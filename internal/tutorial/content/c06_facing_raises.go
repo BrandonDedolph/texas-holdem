@@ -47,9 +47,17 @@ func init() {
 			{
 				Kind: tutorial.SectionDrill,
 				Drill: &tutorial.Drill{
-					Prompt: "You hold Kh Jc. The raiser turns out to have Ad Qs — a " +
-						"typical raising hand that isn't even a pair yet. About what " +
-						"percent of the time does KJo win the pot? (within 5)",
+					Prompt: "The raiser turns out to have AQ — a typical raising hand " +
+						"that isn't even a pair yet. About what percent of the time " +
+						"does your KJo win the pot? (within 5)",
+					Visual: &tutorial.Visual{
+						Showdown: &tutorial.VisualShowdown{
+							Hands: []tutorial.ShownHand{
+								{Label: "You", Hole: engine.Holes("Kh Jc")},
+								{Label: "The raiser", Hole: engine.Holes("Ad Qs")},
+							},
+						},
+					},
 					Answer: tutorial.NumericAnswer{Value: 37, Tolerance: 5},
 					Explain: "About 37%. Two live-looking broadway cards, and you're " +
 						"still a 63:37 underdog before anyone has a pair — because when " +

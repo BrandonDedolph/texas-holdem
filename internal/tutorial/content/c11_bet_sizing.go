@@ -50,9 +50,15 @@ func init() {
 			{
 				Kind: tutorial.SectionDrill,
 				Drill: &tutorial.Drill{
-					Prompt: "You hold Kc Ks on a Qh Jh 9s flop — strong overpair, but " +
-						"straights and flushes are drawing at you everywhere. Better " +
-						"default size?",
+					Prompt: "A strong overpair — but on this flop, straights and " +
+						"flushes are drawing at you everywhere. Better default size?",
+					Visual: &tutorial.Visual{
+						Board: &tutorial.VisualBoard{
+							Board:    engine.MustCards("Qh Jh 9s"),
+							Hole:     engine.Holes("Kc Ks"),
+							ShowHole: true,
+						},
+					},
 					Answer: tutorial.ChoiceAnswer{
 						Choices: []string{
 							"Small (about a third pot) — keep weak hands in",

@@ -213,11 +213,12 @@ func finishSpot(h *engine.Hand, hero engine.Seat, tag string, c *coach.Coach, de
 		return Item{}, false
 	}
 
+	// The hero's cards are drawn in the visual, so the prompt carries only
+	// the situation — codes in prose would just restate the picture.
 	line1 := "On the " + v.Street.String() + ": " + desc + ". You are " +
-		h.Position(hero).String() + " with " + engine.CardsString(v.Hole[:]) + "."
+		h.Position(hero).String() + "."
 	if v.Street == engine.Preflop {
-		line1 = desc + ". You are " + h.Position(hero).String() +
-			" with " + engine.CardsString(v.Hole[:]) + "."
+		line1 = desc + ". You are " + h.Position(hero).String() + "."
 	}
 	line2 := "Pot " + v.Pot.String() + ", to call " + v.ToCall.String() +
 		", blinds " + v.Blinds.Small.String() + "/" + v.Blinds.Big.String() + "."

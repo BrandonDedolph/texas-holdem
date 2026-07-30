@@ -11,6 +11,7 @@
 package content
 
 import (
+	"github.com/BrandonDedolph/texas-holdem/internal/engine"
 	"github.com/BrandonDedolph/texas-holdem/internal/tutorial"
 )
 
@@ -63,8 +64,16 @@ func init() {
 			{
 				Kind: tutorial.SectionDrill,
 				Drill: &tutorial.Drill{
-					Prompt: "Board: Qs Jh 7d 4c 2h. Player A holds Ac Kd. Player B holds " +
-						"7h 8h. Who wins at showdown?",
+					Prompt: "Who wins at showdown?",
+					Visual: &tutorial.Visual{
+						Showdown: &tutorial.VisualShowdown{
+							Board: engine.MustCards("Qs Jh 7d 4c 2h"),
+							Hands: []tutorial.ShownHand{
+								{Label: "Player A", Hole: engine.Holes("Ac Kd")},
+								{Label: "Player B", Hole: engine.Holes("7h 8h")},
+							},
+						},
+					},
 					Answer: tutorial.ChoiceAnswer{
 						Choices: []string{"Player A", "Player B", "Split pot"},
 						Correct: 1,
@@ -83,10 +92,7 @@ func init() {
 			{
 				Kind: tutorial.SectionDrill,
 				Drill: &tutorial.Drill{
-					Prompt: "Order these five-card hands from strongest to weakest:\n" +
-						"  1. Ad 10d 8d 6d 3d\n" +
-						"  2. Kc Kh Kd 4s 4d\n" +
-						"  3. 9c 8d 7h 6s 5c",
+					Prompt: "Order these five-card hands from strongest to weakest:",
 					Answer: tutorial.OrderAnswer{
 						Items:   []string{"Ad 10d 8d 6d 3d", "Kc Kh Kd 4s 4d", "9c 8d 7h 6s 5c"},
 						Correct: []int{1, 0, 2},

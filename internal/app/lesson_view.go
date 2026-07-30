@@ -324,6 +324,10 @@ func (v *lessonView) render(w, h int) string {
 	dot := " " + theme.G.Dot + " "
 
 	budget := h - 4
+	// The compact breakpoint swaps card visuals to their 3-row mini form:
+	// a 5-row study card fits the height budget at 80x24 and up, but at
+	// 60x20 it would push the question off screen.
+	compact := layoutFor(w, h) == LayoutCompact
 	var body []string
 	switch {
 	case v.splash:
@@ -331,9 +335,9 @@ func (v *lessonView) render(w, h int) string {
 	case v.script != nil:
 		body = v.renderScript(w, budget)
 	case v.section().Drill != nil:
-		body = v.renderDrill(w)
+		body = v.renderDrill(w, compact)
 	default:
-		body = v.renderProse(w, budget)
+		body = v.renderProse(w, budget, compact)
 	}
 	for i := range body {
 		body[i] = padStyledTo(body[i], w)
@@ -409,7 +413,7 @@ func (v *lessonView) footerText() string {
 // renderProse draws a text or visual section with scrolling. maxScroll is
 // derived from what actually rendered, so the handler can never scroll the
 // content out of sight.
-func (v *lessonView) renderProse(w, budget int) []string {
+func (v *lessonView) renderProse(w, budget int, compact bool) []string {
 	th := theme.Current
 	cw := w - 2
 	sec := v.section()
@@ -419,11 +423,11 @@ func (v *lessonView) renderProse(w, budget int) []string {
 		lines = append(lines, " "+th.Header.Render(clip(sec.Title, cw)), "")
 	}
 	for _, l := range wrapBody(sec.Text, cw) {
-		lines = append(lines, " "+th.Body.Render(l))
+		lines = append(lines, " "+tutorial.ColorizeCards(l, th.Body))
 	}
 	if sec.Visual != nil {
 		lines = append(lines, "")
-		lines = append(lines, indentBlock(sec.Visual.Render(cw))...)
+		lines = append(lines, indentBlock(renderVisual(sec.Visual, cw, compact))...)
 	}
 
 	v.maxScroll = len(lines) - budget
@@ -440,7 +444,7 @@ func (v *lessonView) renderProse(w, budget int) []string {
 // the answer input; after one, the verdict and the explanation. The visual
 // yields its rows to the explanation once answered so the teaching text is
 // never pushed off screen — retrying brings the visual straight back.
-func (v *lessonView) renderDrill(w int) []string {
+func (v *lessonView) renderDrill(w int, compact bool) []string {
 	th := theme.Current
 	cw := w - 2
 	d := v.section().Drill
@@ -450,7 +454,7 @@ func (v *lessonView) renderDrill(w int) []string {
 		lines = append(lines, " "+th.Header.Render(clip(title, cw)), "")
 	}
 	for _, l := range wrapBody(d.Prompt, cw) {
-		lines = append(lines, " "+th.Body.Render(l))
+		lines = append(lines, " "+tutorial.ColorizeCards(l, th.Body))
 	}
 	lines = append(lines, "")
 
@@ -464,16 +468,25 @@ func (v *lessonView) renderDrill(w int) []string {
 		}
 		lines = append(lines, " "+verdict, "")
 		for _, l := range wrapBody(d.Explain, cw) {
-			lines = append(lines, " "+th.Body.Render(l))
+			lines = append(lines, " "+tutorial.ColorizeCards(l, th.Body))
 		}
 		return append(lines, "", " "+th.Help.Render(hint))
 	}
 
 	if d.Visual != nil {
-		lines = append(lines, indentBlock(d.Visual.Render(cw))...)
+		lines = append(lines, indentBlock(renderVisual(d.Visual, cw, compact))...)
 		lines = append(lines, "")
 	}
 	return append(lines, v.renderDrillInput(d, cw)...)
+}
+
+// renderVisual draws a visual in the form the breakpoint can afford: full
+// study cards normally, 3-row mini cards at the compact floor.
+func renderVisual(vis *tutorial.Visual, width int, compact bool) string {
+	if compact {
+		return vis.RenderCompact(width)
+	}
+	return vis.Render(width)
 }
 
 // renderDrillInput draws the answer widget for the drill's answer type.
@@ -496,7 +509,10 @@ func (v *lessonView) renderDrillInput(d *tutorial.Drill, cw int) []string {
 	case tutorial.OrderAnswer:
 		lines := make([]string, 0, len(ans.Items)+2)
 		for i, item := range ans.Items {
-			lines = append(lines, " "+th.Body.Render(clip("  "+strconv.Itoa(i+1)+". "+item, cw-1)))
+			// Items are often card codes ("Ad 10d 8d 6d 3d"); colorize so
+			// the hands being ordered read as cards, not codes.
+			lines = append(lines, " "+tutorial.ColorizeCards(
+				clip("  "+strconv.Itoa(i+1)+". "+item, cw-1), th.Body))
 		}
 		return append(lines, "",
 			" "+th.Body.Render("your order: "+spreadDigits(v.drill.typed))+caret)
@@ -965,7 +981,7 @@ func (v *lessonView) renderScript(w, budget int) []string {
 	if r.hand == nil {
 		lines := []string{" " + th.Header.Render(clip(sectionTitleOr(v.section(), "Scripted hand"), cw)), ""}
 		for _, l := range wrapBody(r.script.Intro, cw) {
-			lines = append(lines, " "+th.Body.Render(l))
+			lines = append(lines, " "+tutorial.ColorizeCards(l, th.Body))
 		}
 		return append(lines, "", " "+th.Help.Render("enter deals the hand"))
 	}
@@ -1075,7 +1091,9 @@ func (r *scriptRun) coachLines(width, budget int) []string {
 	var lines []string
 	body := func(s string) {
 		for _, l := range wrapPlain(s, width) {
-			lines = append(lines, th.Body.Render(l))
+			// Teach and debrief texts name specific cards ("The 4d missed
+			// you"); render them as cards, matching the board above.
+			lines = append(lines, tutorial.ColorizeCards(l, th.Body))
 		}
 	}
 
