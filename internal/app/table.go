@@ -153,6 +153,7 @@ type TableScreen struct {
 	boardQueued int
 	lastAction  [engine.MaxSeats]string
 	heroLine    string // reserved hero action/grade line (row 15)
+	heroGraded  bool   // heroLine names the decision lastGrade judged
 	revealed    [engine.MaxSeats]bool
 	winners     engine.CardSet // showdown: the cards that play, gold-bordered
 	awardText   string         // latest pot award, shown in the pot region
@@ -164,6 +165,11 @@ type TableScreen struct {
 	paused         bool
 	handDone       bool
 	completeQueued bool
+
+	// overlay is the modal card over the frozen table: a teachable moment
+	// (fired at most once per decision, only when it is the hero's turn) or
+	// the coach's expanded explanation (the e key). Any key dismisses it.
+	overlay *tableOverlay
 
 	help          helpOverlay
 	width, height int
@@ -281,10 +287,11 @@ func (m *TableScreen) startHand() tea.Cmd {
 	m.advice, m.lastGrade = nil, nil
 	m.boardShown, m.boardQueued = 0, 0
 	m.lastAction = [engine.MaxSeats]string{}
-	m.heroLine = ""
+	m.heroLine, m.heroGraded = "", false
 	m.revealed = [engine.MaxSeats]bool{}
 	m.winners = 0
 	m.awardText = ""
+	m.overlay = nil
 	m.queue = nil
 	m.paused, m.handDone, m.completeQueued = false, false, false
 	m.bar.Wait()
@@ -321,9 +328,12 @@ func (m *TableScreen) ingestEvents() {
 			m.lastAction[e.Seat] = label
 			m.pushRecent(m.seatName(e.Seat) + " " + label)
 			if e.Seat == heroSeat {
-				// TODO(wire-coach): append the grade to this line once the
-				// coach can produce one ("3-bet to 90  A matched").
+				// The hero's decision claims the reserved line (row 15).
+				// Its grade — frozen in heroAct just before Apply — is
+				// joined at render time (heroLineRow), so cycling coach
+				// verbosity applies to it live.
 				m.heroLine = label
+				m.heroGraded = true
 			}
 		case engine.EvDealBoard:
 			// One step per card: the flop flips one card at a time so board
@@ -483,14 +493,16 @@ func (m *TableScreen) applyStep(st step) {
 		if firstOfStreet {
 			// A new street: previous street's action labels are stale.
 			// Folded seats keep "folds" — knowing who is gone matters.
+			// The hero's reserved line (row 15) deliberately survives the
+			// street change: it carries the last decision's grade, which
+			// must stay visible until the next decision replaces it
+			// (ui-review F2) — at Fast/Instant a street-cleared grade
+			// would never be seen at all.
 			for s := engine.Seat(0); s.Valid(); s++ {
 				if !m.hand.Live().Has(s) {
 					continue
 				}
 				m.lastAction[s] = ""
-			}
-			if m.hand.Live().Has(heroSeat) {
-				m.heroLine = ""
 			}
 		}
 		m.boardShown = st.n
@@ -500,7 +512,9 @@ func (m *TableScreen) applyStep(st step) {
 		desc := strings.ToLower(eval.Rank(st.rank).String())
 		m.lastAction[st.seat] = "shows " + desc
 		if st.seat == heroSeat {
-			m.heroLine = "shows " + desc
+			// The reveal supersedes the graded action on the reserved line;
+			// the between-hands strip carries the hand's verdict instead.
+			m.heroLine, m.heroGraded = "shows "+desc, false
 		}
 		m.status = m.seatName(st.seat) + " shows " + desc
 	case stepAward:
@@ -591,12 +605,26 @@ func (m *TableScreen) armBar() {
 	// recommendation the hero saw is the one grading uses, which makes the
 	// audit trail airtight regardless of what a recompute would say.
 	//
-	// The previous decision's grade clears here: it belonged to the last
-	// action, and leaving it up would attach it to this one.
-	m.lastGrade = nil
+	// The previous decision's grade is NOT cleared here: it stays on the
+	// hero's reserved line until the next decision replaces it (ui-review
+	// F2). The coach strip cannot attach it to this decision — it shows the
+	// grade only while no fresh advice is up (coachView).
 	if m.coach != nil {
-		adv := m.coach.Advise(m.hand.View(heroSeat))
+		view := m.hand.View(heroSeat)
+		adv := m.coach.Advise(view)
 		m.advice = &adv
+
+		// A teachable moment may fire now — and only now: the trigger runs
+		// exclusively when the hero's turn arms, so a popup can never
+		// interrupt a villain's turn, and PendingMoment fires at most one
+		// unseen moment per decision, marking it seen in the profile
+		// forever. CoachOff means leave me alone, so the moment is not even
+		// consulted there (an unfired moment is not burned — it recurs).
+		if m.coachMode != CoachOff {
+			if mo := m.coach.PendingMoment(view, adv); mo != nil {
+				m.overlay = momentOverlay(mo, view, adv)
+			}
+		}
 	}
 }
 
@@ -684,6 +712,13 @@ func (m *TableScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
+		if m.overlay != nil {
+			// Any key dismisses the modal card; the key is consumed, not
+			// forwarded — the table underneath was frozen, not listening
+			// (the help overlay's protocol).
+			m.overlay = nil
+			return m, nil
+		}
 		cmd, _ := m.help.dispatch(m.keymap(), msg, m.handleAction)
 		return m, cmd
 	}
@@ -755,6 +790,15 @@ func (m *TableScreen) handleAction(a KeyAction) (tea.Cmd, bool) {
 		if m.handDone {
 			return NavigateWithData(ScreenHandReview,
 				ReviewRequest{ReturnTo: ScreenTable}), true
+		}
+		return nil, true
+
+	case ActExpand:
+		// The designed §5.1 expansion: the full reasoning, one keypress
+		// away. Only at CoachFull — at Mistakes/Off expanding would reveal
+		// the opinion the mode exists to withhold.
+		if m.coachMode == CoachFull && m.advice != nil {
+			m.overlay = adviceOverlay(*m.advice)
 		}
 		return nil, true
 

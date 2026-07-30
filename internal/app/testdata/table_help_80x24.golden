@@ -1,24 +1,24 @@
 ╭──────────────────────────────────────────────────────────────────────────────╮
-│                ╭──────────────────────────────────────────╮                  │
-│                │  Controls                                │                  │
-│                │  Table                                   │                  │
-│                │    f    fold                             │                  │
-│                │    x    check (c is call)                │                  │
-│                │    c    call                             │                  │
-│                │    b    bet (opens sizing)               │                  │
-│                │    r    raise (opens sizing)             │                  │
-│                │    a    all-in (confirm with enter)      │                  │
-│                │    tab  cycle coach (Full/Mistakes/Off)  │                  │
-│                │    +    speed up                         │                  │
-│                │    -    slow down                        │                  │
-│                │    ?    help                             │                  │
-│                │    esc  to menu (session kept)           │                  │
-│                │                                          │                  │
-│                │  Everywhere                              │                  │
-│                │    ctrl+c  quit immediately              │                  │
-│                │  Press any key to close                  │                  │
-│                ╰──────────────────────────────────────────╯                  │
-│                                                                              │
+│              ╭──────────────────────────────────────────────╮                │
+│              │  Controls                                    │                │
+│              │  Table                                       │                │
+│              │    f    fold                                 │                │
+│              │    x    check (c is call)                    │                │
+│              │    c    call                                 │                │
+│              │    b    bet (opens sizing)                   │                │
+│              │    r    raise (opens sizing)                 │                │
+│              │    a    all-in (confirm with enter)          │                │
+│              │    e    expand the coach's full explanation  │                │
+│              │    tab  cycle coach (Full/Mistakes/Off)      │                │
+│              │    +    speed up                             │                │
+│              │    -    slow down                            │                │
+│              │    ?    help                                 │                │
+│              │    esc  to menu (session kept)               │                │
+│              │                                              │                │
+│              │  Everywhere                                  │                │
+│              │    ctrl+c  quit immediately                  │                │
+│              │  Press any key to close                      │                │
+│              ╰──────────────────────────────────────────────╯                │
 │                                                                              │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
