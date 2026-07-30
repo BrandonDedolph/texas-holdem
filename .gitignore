@@ -35,3 +35,6 @@ go.work.sum
 
 # GoReleaser output
 dist/
+
+# Agent worktrees
+.claude/worktrees/
