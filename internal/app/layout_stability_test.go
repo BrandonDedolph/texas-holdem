@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/BrandonDedolph/texas-holdem/internal/engine"
 	"github.com/BrandonDedolph/texas-holdem/internal/profile"
 	"github.com/BrandonDedolph/texas-holdem/internal/ui/theme"
 	tea "github.com/charmbracelet/bubbletea"
@@ -179,6 +180,60 @@ func TestComingSoonLayoutStable(t *testing.T) {
 			t.Errorf("%dx%d: placeholder title missing", bp.w, bp.h)
 		}
 	}
+}
+
+// TestTableLayoutStable is the load-bearing table invariant (§8.1): every
+// anchor holds its exact position and the view height never changes across
+// every state mutation, at all three breakpoints. Game state was reached
+// through the engine (a flop checked to the hero); the mutations below are
+// presentation-only fields — the sanctioned exception, since this test is
+// about rendering, not rules.
+func TestTableLayoutStable(t *testing.T) {
+	anchorsFor := func(w, h int) []string {
+		if layoutFor(w, h) == LayoutCompact {
+			return []string{"#1", "YOU", "Board", "esc menu"}
+		}
+		return []string{"Hand #1", "YOU", "Nia", "? help", "esc menu"}
+	}
+	longLabel := strings.Repeat("raises to 999,999 ", 4)
+
+	for _, bp := range breakpoints {
+		m := buildTable(t, scenarioFlopChoosing(), bp.w, bp.h)
+		sized(t, m, bp.w, bp.h)
+
+		assertAnchorsStable(t, m.View, anchorsFor(bp.w, bp.h),
+			map[string]func(){
+				"villain action absurdly long": func() { m.lastAction[2] = longLabel },
+				"villain action cleared":       func() { m.lastAction[2] = "" },
+				"board hidden":                 func() { m.boardShown = 0 },
+				"board full flop":              func() { m.boardShown = 3 },
+				"hero grade line long":         func() { m.heroLine = longLabel },
+				"coach off":                    func() { m.coachMode = CoachOff },
+				"coach full":                   func() { m.coachMode = CoachFull },
+				"bar waiting":                  func() { m.bar.Wait() },
+				"bar choosing again":           func() { m.armBar() },
+				"bar sizing":                   func() { m.bar.OpenSizing(engine.ActionBet) },
+				"award text set":               func() { m.awardText = "MAIN 900 to Sam (two pair, nines and fives)" },
+				"award text cleared":           func() { m.awardText = "" },
+				"status very long":             func() { m.status = longLabel + longLabel },
+				"hand done footer":             func() { m.handDone = true },
+				"hand live footer":             func() { m.handDone = false },
+			})
+	}
+}
+
+// TestTableSidePotLineStable: the pot region switching from a single POT to
+// MAIN + SIDE layers must not move anything else (the pot text itself is
+// centered and changes, so it is deliberately not an anchor).
+func TestTableSidePotLineStable(t *testing.T) {
+	m := buildTable(t, scenarioSidePot(), 80, 24)
+	sized(t, m, 80, 24)
+	assertAnchorsStable(t, m.View,
+		[]string{"Hand #1", "YOU", "Nia", "esc menu"},
+		map[string]func(){
+			"single pot":  func() { m.awardText = "POT 1,060" },
+			"multi again": func() { m.awardText = "" },
+		})
 }
 
 // TestQuickReferencePanelsFitCompact guards the content itself: every panel

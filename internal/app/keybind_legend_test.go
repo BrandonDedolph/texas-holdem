@@ -32,6 +32,11 @@ func legendScreens(t *testing.T) []legendScreen {
 		{"Settings", NewSettings(p, prefs)},
 		{"QuickReference", NewQuickReference()},
 		{"ComingSoon", newComingSoon(ScreenLessons)},
+		// The table without Init: no hand dealt, waiting state — its most
+		// static keymap. The state-dependent maps are probed by the
+		// TestTable* legend tests below.
+		{"Table", NewTableScreen(TableConfig{SmallBlind: 5, BigBlind: 10,
+			Stack: 1000, Speed: SpeedInstant}, prefs)},
 	}
 	for _, s := range screens {
 		s.model.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
@@ -43,12 +48,17 @@ func legendScreens(t *testing.T) []legendScreen {
 // key resolves to exactly one action.
 func TestKeymapKeysAreUnique(t *testing.T) {
 	maps := map[string]KeyMap{
-		"mainMenuKeys":   mainMenuKeys,
-		"gameSetupKeys":  gameSetupKeys,
-		"settingsKeys":   settingsKeys,
-		"quickRefKeys":   quickRefKeys,
-		"comingSoonKeys": comingSoonKeys,
-		"globalKeys":     globalKeys,
+		"mainMenuKeys":      mainMenuKeys,
+		"gameSetupKeys":     gameSetupKeys,
+		"settingsKeys":      settingsKeys,
+		"quickRefKeys":      quickRefKeys,
+		"comingSoonKeys":    comingSoonKeys,
+		"globalKeys":        globalKeys,
+		"tableWaitingKeys":  tableWaitingKeys,
+		"tablePauseKeys":    tablePauseKeys,
+		"tableChoosingKeys": tableChoosingKeys,
+		"tableSizingKeys":   tableSizingKeys,
+		"tableHandDoneKeys": tableHandDoneKeys,
 	}
 	for name, km := range maps {
 		seen := map[string]bool{}
@@ -146,6 +156,109 @@ func TestHelpOverlayDocumentsKeymap(t *testing.T) {
 		}
 		if !strings.Contains(view, "Press any key to close") {
 			t.Errorf("%s: help overlay must say how to close", s.name)
+		}
+	}
+}
+
+// TestTableKeymapTracksState: the table's keymap() must follow its
+// interaction state, so the help overlay and the legend always describe the
+// keys that are actually live (§8.2).
+func TestTableKeymapTracksState(t *testing.T) {
+	same := func(a, b KeyMap) bool { return len(a) == len(b) && &a[0] == &b[0] }
+
+	m := buildTable(t, scenarioPreflop(), 80, 24)
+	if !same(m.keymap(), tableChoosingKeys) {
+		t.Error("hero to act: keymap must be the choosing set")
+	}
+
+	m = buildTable(t, scenarioFlopSizing(), 80, 24)
+	if !same(m.keymap(), tableSizingKeys) {
+		t.Error("sizing open: keymap must be the sizing set")
+	}
+
+	m = buildTable(t, scenarioShowdown(), 80, 24)
+	if !same(m.keymap(), tableHandDoneKeys) {
+		t.Error("between hands: keymap must be the hand-done set")
+	}
+
+	sc := scenarioFlopChoosing()
+	sc.speed = SpeedLearn
+	m = buildTable(t, sc, 80, 24)
+	if !m.paused {
+		t.Fatal("Learn speed should be paused after the flop here")
+	}
+	if !same(m.keymap(), tablePauseKeys) {
+		t.Error("street pause: keymap must be the pause set")
+	}
+}
+
+// TestTableChoosingKeysMatchRenderedKeycaps drives the full invariant
+// through the screen: in a given legality state, a poker key changes the
+// game if and only if its keycap is on screen.
+func TestTableChoosingKeysMatchRenderedKeycaps(t *testing.T) {
+	cases := []struct {
+		name     string
+		scenario func() tableScenario
+		acts     map[string]string // key -> keycap text that must be rendered
+		ignored  []string          // keys whose keycap is absent and press inert
+	}{
+		{
+			name:     "preflop facing the blind",
+			scenario: scenarioPreflop,
+			acts:     map[string]string{"f": "f fold", "c": "c call", "r": "r raise"},
+			ignored:  []string{"x", "b"},
+		},
+		{
+			name:     "flop checked to hero",
+			scenario: scenarioFlopChoosing,
+			acts:     map[string]string{"x": "x check", "b": "b bet"},
+			ignored:  []string{"f", "c"},
+		},
+	}
+	for _, tc := range cases {
+		view := stripANSI(buildTable(t, tc.scenario(), 80, 24).View())
+		for k, cap := range tc.acts {
+			if !strings.Contains(view, cap) {
+				t.Errorf("%s: keycap %q not rendered", tc.name, cap)
+			}
+			m := buildTable(t, tc.scenario(), 80, 24) // fresh: keys mutate
+			before := m.hand.Events()
+			m.Update(key(k))
+			if len(m.hand.Events()) == len(before) && m.bar.State() == ActionBarChoosing {
+				t.Errorf("%s: rendered key %q did nothing", tc.name, k)
+			}
+		}
+		for _, k := range tc.ignored {
+			m := buildTable(t, tc.scenario(), 80, 24)
+			before := m.View()
+			m.Update(key(k))
+			if m.View() != before {
+				t.Errorf("%s: key %q has no keycap but changed the view", tc.name, k)
+			}
+		}
+	}
+}
+
+// TestTableHelpOverlayPerState: every state's help sheet documents exactly
+// its keymap.
+func TestTableHelpOverlayPerState(t *testing.T) {
+	states := map[string]func() *TableScreen{
+		"choosing": func() *TableScreen { return buildTable(t, scenarioPreflop(), 80, 24) },
+		"sizing":   func() *TableScreen { return buildTable(t, scenarioFlopSizing(), 80, 24) },
+		"handDone": func() *TableScreen { return buildTable(t, scenarioShowdown(), 80, 24) },
+	}
+	for name, build := range states {
+		m := build()
+		km := m.keymap()
+		m.Update(key("?"))
+		view := m.View()
+		for _, b := range km {
+			if !strings.Contains(view, b.Label) {
+				t.Errorf("%s help: missing keycap %q", name, b.Label)
+			}
+			if !strings.Contains(view, b.Help) {
+				t.Errorf("%s help: missing description %q", name, b.Help)
+			}
 		}
 	}
 }
