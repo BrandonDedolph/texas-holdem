@@ -507,6 +507,12 @@ current honest split.
 
 ## 5. Open questions for the owner
 
+> **Resolved 2026-07-30.** All six were decided by the owner and implemented;
+> each answer is recorded beneath its question. They are recorded rather than
+> deleted because the reasoning is the useful part — if one turns out wrong in
+> practice, the note says what was traded away.
+
+
 1. **Who is the 104-column layout for?** The side panel fixes F1 for wide
    terminals, and the effort of making wide genuinely richer (log + session
    stats + full reasoning) only pays if you actually play wide. If your
@@ -532,3 +538,38 @@ current honest split.
 6. **Trainer levels: hidden difficulty or visible ladder?** The menu shows
    `level 1/3` but nothing says what levels change or how close you are.
    Showing the mechanism motivates some people and clutters it for others.
+
+   > **Decided: visible.** `level 1/3` without saying what a level changes or
+   > how close you are is a number pretending to be information. The data
+   > already exists in `profile.SkillStat`.
+
+
+   > **Decided: make it genuinely silent.** It printed the same pot-odds
+   > string the action bar already showed two rows lower. With the opinion
+   > withheld until the player errs, the silence itself carries information —
+   > the coach speaking up means something is wrong. The price stays at 60×20,
+   > where the coach line is the only place it appears.
+
+
+   > **Decided: keep lockstep, add an opt-in unlock.** The locks are
+   > defensible pedagogy and each one explains itself, so they stay the
+   > default. But the owner is the only learner this app has, and it should
+   > not fight him: a setting lifts them.
+
+
+   > **Decided: during play, not a stats screen.** Running session accuracy
+   > beside net chips in the between-hands strip, permanently in the wide
+   > layout. Shown side by side and allowed to disagree — the disagreement is
+   > the variance lesson, so they are never blended into one score.
+
+
+   > **Decided: require a second esc.** Every other screen treats esc as
+   > "back", so a bare esc quitting the app contradicts the muscle memory the
+   > rest of the product builds. A status flash costs one line.
+
+
+
+   > **Decided: make wide genuinely richer.** Full coach reasoning without
+   > the `e` overlay, a longer action log, and live session stats. The wide
+   > layout should be a reward for having the room, not the same game with a
+   > margin. 80×24 remains the target and must not regress to serve it.
