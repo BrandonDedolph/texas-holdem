@@ -23,6 +23,9 @@ import (
 // session's size, the weakest drill — and the cursor starts on the door the
 // profile says is the player's path, not unconditionally on Play.
 type MainMenu struct {
+	// confirmQuit is set by the first esc; the second one actually quits.
+	confirmQuit bool
+
 	prof *profile.Profile
 	reg  *tutorial.Registry
 
@@ -196,6 +199,12 @@ func (m *MainMenu) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *MainMenu) keymap() KeyMap { return mainMenuKeys }
 
 func (m *MainMenu) handleAction(a KeyAction) (tea.Cmd, bool) {
+	// Anything that is not esc means the player was not trying to leave, so
+	// a later stray esc asks again rather than quitting on what feels to
+	// them like a first press.
+	if a != ActBack {
+		m.confirmQuit = false
+	}
 	switch a {
 	case ActUp:
 		m.cursor = (m.cursor - 1 + menuRowCount) % menuRowCount
@@ -206,7 +215,14 @@ func (m *MainMenu) handleAction(a KeyAction) (tea.Cmd, bool) {
 	case ActSelect:
 		return m.handleSelect(), true
 	case ActBack:
-		return Quit(), true
+		// Every other screen treats esc as "back", so a bare esc quitting the
+		// app contradicts the muscle memory the rest of the product builds.
+		// Ask once (docs/ui-review.md §5 q2).
+		if m.confirmQuit {
+			return Quit(), true
+		}
+		m.confirmQuit = true
+		return nil, true
 	}
 	return nil, false
 }
@@ -282,7 +298,7 @@ func (m *MainMenu) View() string {
 	return renderShell(w, h, shell{
 		Title:      "TEXAS HOLD'EM",
 		TitleExtra: renderSuitBanner(),
-		Status:     rows[m.cursor].detail,
+		Status:     m.statusRow(rows),
 		Footer: "up/down move " + theme.G.Dot + " enter select " +
 			theme.G.Dot + " esc quit",
 	}, content)
@@ -298,4 +314,13 @@ func renderSuitBanner() string {
 		theme.SuitStyle(engine.Hearts).Render(g.SuitHeart) + " " +
 		theme.SuitStyle(engine.Diamonds).Render(g.SuitDiamond) + " " +
 		theme.SuitStyle(engine.Clubs).Render(g.SuitClub)
+}
+
+// statusRow is the selected row's detail, unless a quit confirmation is
+// pending — an unanswered question outranks a description.
+func (m *MainMenu) statusRow(rows []menuRow) string {
+	if m.confirmQuit {
+		return "press esc again to quit"
+	}
+	return rows[m.cursor].detail
 }

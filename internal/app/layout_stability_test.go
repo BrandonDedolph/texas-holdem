@@ -173,24 +173,6 @@ func TestQuickReferenceLayoutStable(t *testing.T) {
 	}
 }
 
-func TestComingSoonLayoutStable(t *testing.T) {
-	for _, bp := range breakpoints {
-		c := newComingSoon(ScreenTable)
-		c.detail = tableConfigSummary(TableConfig{
-			SmallBlind: 5, BigBlind: 10, Stack: 1000,
-			Lineup: ClassroomLineup(), CoachMode: CoachFull, Speed: SpeedLearn,
-		})
-		sized(t, c, bp.w, bp.h)
-
-		// A placeholder has no state to mutate; what matters is that its
-		// frame fills the terminal exactly (checked by sized above) and the
-		// title anchor exists.
-		if posOf(c.View(), "Table").row < 0 {
-			t.Errorf("%dx%d: placeholder title missing", bp.w, bp.h)
-		}
-	}
-}
-
 // TestTableLayoutStable is the load-bearing table invariant (§8.1): every
 // anchor holds its exact position and the view height never changes across
 // every state mutation, at all three breakpoints. Game state was reached

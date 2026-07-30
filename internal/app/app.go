@@ -23,9 +23,7 @@ import (
 // Screen identifies a screen in the application.
 type Screen int
 
-// Screens (docs/design-tui.md §1.1). Lessons and Trainer are routed but
-// currently land on placeholders — their models arrive with the packages
-// they depend on. TODO(wire-lessons) TODO(wire-trainer).
+// Screens (docs/design-tui.md §1.1). Every screen has a real model.
 const (
 	ScreenMainMenu Screen = iota
 	ScreenGameSetup
@@ -247,70 +245,6 @@ type EndSessionMsg struct{}
 // EndSession returns a command that ends the table session.
 func EndSession() tea.Cmd {
 	return func() tea.Msg { return EndSessionMsg{} }
-}
-
-// --- ComingSoon ---------------------------------------------------------------
-
-// ComingSoon is the honest placeholder for screens whose real models depend
-// on packages that have not landed yet. It routes, resizes, and says exactly
-// what it is — so navigation, session preservation and the keybind tests
-// exercise the real plumbing today.
-type ComingSoon struct {
-	screen   Screen
-	detail   []string // extra context, e.g. the TableConfig summary
-	returnTo Screen
-	help     helpOverlay
-	width    int
-	height   int
-}
-
-// newComingSoon builds a placeholder for the given screen.
-func newComingSoon(screen Screen) *ComingSoon {
-	return &ComingSoon{screen: screen, returnTo: ScreenMainMenu}
-}
-
-// Init implements tea.Model.
-func (c *ComingSoon) Init() tea.Cmd { return nil }
-
-// Update implements tea.Model.
-func (c *ComingSoon) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		c.width, c.height = msg.Width, msg.Height
-	case tea.KeyMsg:
-		cmd, _ := c.help.dispatch(c.keymap(), msg, c.handleAction)
-		return c, cmd
-	}
-	return c, nil
-}
-
-func (c *ComingSoon) keymap() KeyMap { return comingSoonKeys }
-
-func (c *ComingSoon) handleAction(a KeyAction) (tea.Cmd, bool) {
-	switch a {
-	case ActBack:
-		return Navigate(c.returnTo), true
-	}
-	return nil, false
-}
-
-// View implements tea.Model.
-func (c *ComingSoon) View() string {
-	w, h := fallbackSize(c.width, c.height)
-	if c.help.open {
-		return renderHelp(c.screen.String(), c.keymap(), w, h)
-	}
-	th := theme.Current
-
-	var b strings.Builder
-	b.WriteString(th.Title.Render(c.screen.String()) + "\n")
-	b.WriteString(th.Subtitle.Render("Coming soon: this screen arrives with a later build wave.") + "\n")
-	for _, line := range c.detail {
-		b.WriteString("\n" + th.Body.Render(line))
-	}
-	b.WriteString("\n\n" + th.Help.Render(
-		"esc back "+theme.G.Dot+" ? help"))
-	return frame(w, h, b.String())
 }
 
 // defaultTableConfig assembles a session config from the profile's

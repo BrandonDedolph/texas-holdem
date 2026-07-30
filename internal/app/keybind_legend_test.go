@@ -31,7 +31,6 @@ func legendScreens(t *testing.T) []legendScreen {
 		{"GameSetup", NewGameSetup(p, prefs)},
 		{"Settings", NewSettings(p, prefs)},
 		{"QuickReference", NewQuickReference()},
-		{"ComingSoon", newComingSoon(ScreenLessons)},
 		// The review without a model: the empty state, its most static form.
 		// The populated screen's legend behaviour is probed by the
 		// TestHandReview* tests in hand_review_test.go.
@@ -56,7 +55,6 @@ func TestKeymapKeysAreUnique(t *testing.T) {
 		"gameSetupKeys":     gameSetupKeys,
 		"settingsKeys":      settingsKeys,
 		"quickRefKeys":      quickRefKeys,
-		"comingSoonKeys":    comingSoonKeys,
 		"handReviewKeys":    handReviewKeys,
 		"globalKeys":        globalKeys,
 		"tableWaitingKeys":  tableWaitingKeys,
@@ -107,7 +105,7 @@ func TestUndocumentedKeysAreIgnored(t *testing.T) {
 		"a": true, "v": true, "+": true, "-": true, "tab": true,
 		"pgdown": true, "f1": true, "ctrl+r": true, "backspace": true,
 	}
-	for _, km := range []KeyMap{mainMenuKeys, gameSetupKeys, settingsKeys, quickRefKeys, comingSoonKeys} {
+	for _, km := range []KeyMap{mainMenuKeys, gameSetupKeys, settingsKeys, quickRefKeys} {
 		for _, b := range km {
 			for _, k := range b.Keys {
 				probe[k] = true

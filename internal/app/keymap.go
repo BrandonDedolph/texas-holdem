@@ -163,11 +163,6 @@ var (
 		bindHelp,
 	}
 
-	comingSoonKeys = KeyMap{
-		backBinding("back to menu"),
-		bindHelp,
-	}
-
 	// The hand-review screen: step between hero decisions with the arrows
 	// (the step past the last decision is the result frame), esc returns to
 	// wherever the review was opened from (ReviewRequest.ReturnTo).

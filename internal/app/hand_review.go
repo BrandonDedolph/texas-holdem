@@ -142,12 +142,15 @@ func (r *HandReview) View() string {
 // viewEmpty is the no-hand state: honest, framed, and still fully navigable.
 func (r *HandReview) viewEmpty(w, h int) string {
 	th := theme.Current
-	var b strings.Builder
-	b.WriteString(th.Title.Render("Hand Review") + "\n")
-	b.WriteString(th.Subtitle.Render("No completed hand to review yet.") + "\n\n")
-	b.WriteString(th.Body.Render("Finish a hand at the table, then press v between hands.") + "\n\n")
-	b.WriteString(th.Help.Render("esc back " + theme.G.Dot + " ? help"))
-	return frame(w, h, b.String())
+	body := th.Subtitle.Render("No completed hand to review yet.") + "\n\n" +
+		th.Body.Render("Finish a hand at the table, then press v between hands.")
+	// The shared chrome, not a bordered box: the rounded border means
+	// "overlay" everywhere else in the app, and this is a screen.
+	return renderShell(w, h, shell{
+		Title:  "Hand Review",
+		Status: "nothing to replay yet",
+		Footer: "esc back",
+	}, body)
 }
 
 // fullRows builds the 24 rows of the >=80x24 layout.

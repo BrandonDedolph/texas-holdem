@@ -171,3 +171,44 @@ func TestMainMenuSelectRoutesEveryRow(t *testing.T) {
 		t.Error("Quit row must emit QuitMsg")
 	}
 }
+
+// TestEscAsksBeforeQuitting: every other screen treats esc as "back", so a
+// bare esc quitting the app contradicts the muscle memory the rest of the
+// product builds (docs/ui-review.md §5 q2).
+func TestEscAsksBeforeQuitting(t *testing.T) {
+	m := NewMainMenu(profile.NewProfile())
+	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	cmd, _ := m.handleAction(ActBack)
+	if cmd != nil {
+		t.Fatal("the first esc must not quit")
+	}
+	if !strings.Contains(m.View(), "press esc again to quit") {
+		t.Errorf("the first esc must say what a second one does:\n%s", m.View())
+	}
+
+	cmd, _ = m.handleAction(ActBack)
+	if cmd == nil {
+		t.Fatal("the second esc must quit")
+	}
+	if msg := cmd(); msg != (QuitMsg{}) {
+		t.Errorf("second esc sent %T, want QuitMsg", msg)
+	}
+}
+
+// TestQuitConfirmationClearsOnOtherKeys: moving the cursor means the player
+// was not trying to leave, so a later stray esc must ask again rather than
+// quitting on what looks to them like a first press.
+func TestQuitConfirmationClearsOnOtherKeys(t *testing.T) {
+	m := NewMainMenu(profile.NewProfile())
+	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+
+	m.handleAction(ActBack)
+	m.handleAction(ActDown)
+	if strings.Contains(m.View(), "press esc again") {
+		t.Error("moving the cursor should clear the pending confirmation")
+	}
+	if cmd, _ := m.handleAction(ActBack); cmd != nil {
+		t.Error("after clearing, the next esc must ask again rather than quit")
+	}
+}
