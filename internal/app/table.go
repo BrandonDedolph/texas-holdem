@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/BrandonDedolph/texas-holdem/internal/ai"
+	"github.com/BrandonDedolph/texas-holdem/internal/ai/rulebased"
 	"github.com/BrandonDedolph/texas-holdem/internal/engine"
 	"github.com/BrandonDedolph/texas-holdem/internal/equity"
 	"github.com/BrandonDedolph/texas-holdem/internal/eval"
@@ -33,17 +35,35 @@ const heroName = "YOU"
 // physically cannot contain other seats' hole cards, which is what makes
 // "bots provably cannot cheat" an honest claim.
 //
-// TODO(wire-ai): internal/ai's Player satisfies this; it is being built in
-// parallel. Until it lands, checkCallOpponent below keeps the table playable
-// and tests use scripted stubs.
+// ai.Player satisfies this interface; the table keeps its own declaration so
+// tests can drive scripted villains without pulling in the whole strategy
+// engine.
 type Opponent interface {
 	Act(v *engine.PlayerView) engine.Action
 	Name() string
 }
 
-// checkCallOpponent is the placeholder villain: checks when free, calls
-// when not. Passive to a fault, but always legal — and a table of stations
-// is at least an honest opponent for pot-odds practice. TODO(wire-ai).
+// newArchetypeOpponent builds a villain from an archetype key. An unknown key
+// falls back to the tight-aggressive baseline rather than failing: a stale
+// lineup in a saved profile should seat a sensible opponent, not break the
+// table.
+//
+// The seed is derived from the seat so each villain's mixed decisions (bluff
+// or not) differ from its neighbours' while staying reproducible across
+// replays of the same hand.
+func newArchetypeOpponent(key, name string, seed int64) Opponent {
+	p, ok := ai.Archetype(key)
+	if !ok {
+		p = ai.Baseline()
+	}
+	return rulebased.New(name, p, seed)
+}
+
+// checkCallOpponent checks when checking is free and calls when it is not.
+// Real villains come from internal/ai; this exists so tests can reach a
+// given board state without the strategy engine's decisions (and its seeded
+// bluffing) making the path depend on strategy tuning. A golden render should
+// break when the layout changes, not when a chart is adjusted.
 type checkCallOpponent struct{ name string }
 
 // Name implements Opponent.
@@ -158,8 +178,7 @@ func NewTableScreen(cfg TableConfig, prefs *Prefs) *TableScreen {
 			break
 		}
 		stacks[s] = cfg.Stack
-		// TODO(wire-ai): construct the archetype from cfg.Lineup[i] here.
-		opps[s] = checkCallOpponent{name: villainNames[s]}
+		opps[s] = newArchetypeOpponent(cfg.Lineup[i], villainNames[s], int64(s))
 	}
 	return newTableScreen(cfg, prefs, stacks, opps)
 }

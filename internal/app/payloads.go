@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/BrandonDedolph/texas-holdem/internal/ai"
 	"github.com/BrandonDedolph/texas-holdem/internal/engine"
 	"github.com/BrandonDedolph/texas-holdem/internal/profile"
 )
@@ -125,37 +126,40 @@ func (s Speed) String() string {
 }
 
 // --- Opponent archetypes ------------------------------------------------------
-//
-// TODO(wire-ai): these keys and labels become ai package presets once
-// internal/ai lands (design-learning.md §4.6). Until then they are plain
-// data so game setup can choose a lineup today; the keys are the contract —
-// they match profile.DefaultTableConfig and will match the ai registry.
 
 // Archetype describes one opponent style for the setup screen.
 type Archetype struct {
 	Key   string // stable identifier persisted in profiles ("nit")
-	Label string // display name ("Nit")
+	Label string // display name ("The Nit")
 	Blurb string // one-line description for the setup screen
 }
 
-// Archetypes lists every opponent style, in teaching order (tightest to
-// wildest) — the order itself sketches the tight/loose, passive/aggressive
-// axes a beginner needs to internalize.
+// archetypeOrder is the teaching order (tightest to wildest); the order
+// itself sketches the tight/loose and passive/aggressive axes a beginner
+// needs to internalize. The "coach" preset is deliberately absent — it is the
+// hero's advisor, not a seat you play against.
+var archetypeOrder = []string{"nit", "tag", "lag", "station", "maniac"}
+
+// Archetypes lists every selectable opponent style, projecting the ai
+// package's presets into what the setup screen needs. The ai registry is the
+// single source of truth for keys, labels, and blurbs — this used to be a
+// duplicated literal, which is exactly how a UI list drifts out of sync with
+// the behaviour it names.
 func Archetypes() []Archetype {
-	return []Archetype{
-		{Key: "nit", Label: "Nit", Blurb: "plays only premium hands; a big bet means it"},
-		{Key: "tag", Label: "TAG", Blurb: "tight-aggressive; solid ranges, applies pressure"},
-		{Key: "lag", Label: "LAG", Blurb: "loose-aggressive; wide ranges, relentless betting"},
-		{Key: "station", Label: "Station", Blurb: "calling station; never folds, rarely raises"},
-		{Key: "maniac", Label: "Maniac", Blurb: "raises everything; huge swings, thin values"},
+	out := make([]Archetype, 0, len(archetypeOrder))
+	for _, key := range archetypeOrder {
+		p, ok := ai.Archetype(key)
+		if !ok {
+			continue
+		}
+		out = append(out, Archetype{Key: p.Key, Label: p.Label, Blurb: p.Blurb})
 	}
+	return out
 }
 
 // ClassroomLineup is the default opponent mix (DESIGN.md §2.11): one of each
 // archetype, so every hand demonstrates the full spectrum of styles.
-func ClassroomLineup() []string {
-	return []string{"nit", "tag", "lag", "station", "maniac"}
-}
+func ClassroomLineup() []string { return append([]string(nil), ai.ClassroomMix...) }
 
 // LineupPreset is a named table composition the setup screen can cycle
 // through. Presets rather than per-seat pickers: a beginner should choose a
