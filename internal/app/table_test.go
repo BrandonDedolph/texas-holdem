@@ -180,7 +180,7 @@ func TestTableReachesHeroTurnPreflop(t *testing.T) {
 	if m.bar.State() != ActionBarChoosing {
 		t.Fatalf("bar state = %v, want choosing", m.bar.State())
 	}
-	if !strings.Contains(m.status, "Your turn") {
+	if !strings.Contains(m.status, "your turn") {
 		t.Errorf("status = %q, want a your-turn prompt", m.status)
 	}
 	if m.hand.CurrentSeat() != heroSeat {

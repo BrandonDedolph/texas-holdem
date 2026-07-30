@@ -584,7 +584,7 @@ func (m *TableScreen) coachNeutral() string {
 }
 
 // handVerdict summarizes the finished hand's frozen grades for the
-// between-hands strip: "hand over · 1 Best, 1 Mistake (-1.2bb) · v reviews".
+// between-hands strip: "hand over · 1 Best, 1 Mistake (-1.2bb) · v review".
 // It returns "" when the mode withholds it — CoachOff stays silent, and
 // CoachMistakes speaks only when a decision actually leaked (§5.4).
 func (m *TableScreen) handVerdict() string {
@@ -617,7 +617,7 @@ func (m *TableScreen) handVerdict() string {
 	if loss >= 0.05 {
 		s += " (-" + strconv.FormatFloat(loss, 'f', 1, 64) + "bb)"
 	}
-	return s + dot + "v reviews"
+	return s + dot + "v review"
 }
 
 // --- Compact ledger (<80 cols, §2.7) ----------------------------------------

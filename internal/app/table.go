@@ -571,7 +571,7 @@ func (m *TableScreen) finishHand() {
 	m.handDone = true
 	m.bar.Wait()
 	dot := " " + theme.G.Dot + " "
-	m.status = "hand complete" + dot + "space deals the next" + dot + "v reviews"
+	m.status = "hand complete" + dot + "space deals the next" + dot + "v review"
 }
 
 // afterQueue runs when nothing is animating: arm the hero's action bar,
@@ -635,7 +635,7 @@ func (m *TableScreen) armBar() {
 		}
 	}
 	m.bar.Arm(legal, m.hand.Street(), pot, toCall, committed, m.cfg.BigBlind, info)
-	m.status = "Your turn " + theme.G.Dot + " " + m.choicesSummary()
+	m.status = "your turn " + theme.G.Dot + " " + m.choicesSummary()
 
 	// Advice is captured the moment the turn begins and frozen. The
 	// recommendation the hero saw is the one grading uses, which makes the
@@ -805,7 +805,7 @@ func (m *TableScreen) handleAction(a KeyAction) (tea.Cmd, bool) {
 	case ActBack:
 		if m.bar.State() == ActionBarSizing {
 			m.bar.Cancel()
-			m.status = "Your turn " + theme.G.Dot + " " + m.choicesSummary()
+			m.status = "your turn " + theme.G.Dot + " " + m.choicesSummary()
 			return nil, true
 		}
 		// Leave for the menu; the session stays cached (App keeps this model
