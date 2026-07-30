@@ -88,6 +88,22 @@ func (set SeatSet) Next(after Seat) Seat {
 	return NoSeat
 }
 
+// Prev returns the previous seat in the set counter-clockwise from (and
+// excluding) before, wrapping around the table — Next's mirror. Returns
+// NoSeat if the set is empty.
+func (set SeatSet) Prev(before Seat) Seat {
+	if set == 0 {
+		return NoSeat
+	}
+	for i := 1; i <= MaxSeats; i++ {
+		s := Seat((int(before) - i + 2*MaxSeats) % MaxSeats)
+		if set.Has(s) {
+			return s
+		}
+	}
+	return NoSeat
+}
+
 // Position names a seat's strategic position at the table. Position is a
 // function of the button and the set of seats dealt in, never stored state.
 type Position uint8

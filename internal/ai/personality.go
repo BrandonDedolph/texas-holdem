@@ -9,6 +9,13 @@ type Personality struct {
 	Label string // display name: "Tight-Aggressive"
 	Blurb string // one-line table read shown to the player
 
+	// Read is the one-word seat-plate read (≤6 chars, lowercase): "tight",
+	// "wild". It is the Blurb's adjustment lesson compressed to a word the
+	// table can carry beside the name — "sticky" says don't bluff me,
+	// "wild" says don't believe me. It lives on the Personality so the
+	// word and the dials below cannot drift apart.
+	Read string
+
 	// RangeScale scales every preflop chart: 1.0 plays the chart as
 	// printed, 0.7 plays the strongest 70% of it (a nit), 1.6 extends past
 	// it into progressively weaker hands (a LAG). Charts are written

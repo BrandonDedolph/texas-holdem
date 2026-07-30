@@ -16,7 +16,7 @@ func TestArchetypePresets(t *testing.T) {
 		if !ok {
 			t.Fatalf("archetype %q missing", key)
 		}
-		if p.Key != key || p.Label == "" || p.Blurb == "" {
+		if p.Key != key || p.Label == "" || p.Blurb == "" || p.Read == "" {
 			t.Errorf("archetype %q metadata incomplete: %+v", key, p)
 		}
 	}
@@ -51,6 +51,40 @@ func TestArchetypePresets(t *testing.T) {
 	}
 	if station.BluffFreq >= nit.BluffFreq {
 		t.Error("station must bluff less than the nit")
+	}
+}
+
+// TestArchetypeReads pins the one-word seat-plate reads. The words are the
+// adjustment lessons: "sticky" (calls everything — don't bluff me), "wild"
+// (raises everything — don't believe me). The seat plate gives the word six
+// or fewer characters, and duplicate words among seatable archetypes would
+// make two different lessons look identical at the table.
+func TestArchetypeReads(t *testing.T) {
+	want := map[string]string{
+		"nit":     "tight",
+		"tag":     "solid",
+		"lag":     "loose",
+		"station": "sticky",
+		"maniac":  "wild",
+	}
+	seen := map[string]string{}
+	for key, read := range want {
+		p := Archetypes[key]
+		if p.Read != read {
+			t.Errorf("archetype %q Read = %q, want %q", key, p.Read, read)
+		}
+		if n := len([]rune(p.Read)); n == 0 || n > 6 {
+			t.Errorf("archetype %q Read %q must be 1–6 characters, got %d", key, p.Read, n)
+		}
+		if other, dup := seen[p.Read]; dup {
+			t.Errorf("archetypes %q and %q share the read %q", key, other, p.Read)
+		}
+		seen[p.Read] = key
+	}
+	// The coach IS the TAG game; a diverging read would claim otherwise.
+	if Archetypes["coach"].Read != Archetypes["tag"].Read {
+		t.Errorf("coach Read %q diverges from tag Read %q",
+			Archetypes["coach"].Read, Archetypes["tag"].Read)
 	}
 }
 
