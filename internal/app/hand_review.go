@@ -161,8 +161,7 @@ func (r *HandReview) fullRows(w int) []string {
 	rows = append(rows, r.seatRows(w)...)   // 3-8
 	rows = append(rows, rule)               // 9
 	rows = append(rows, r.boardBand(w)...)  // 10-12
-	rows = append(rows, blank)              // 13
-	rows = append(rows, r.panelRows(w)...)  // 14-17
+	rows = append(rows, r.panelRows(w)...)  // 13-17
 	rows = append(rows, rule)               // 18
 	rows = append(rows, r.ledgerRows(w)...) // 19-20
 	rows = append(rows, blank, blank)       // 21-22
@@ -174,7 +173,6 @@ func (r *HandReview) fullRows(w int) []string {
 // compactRows builds the 20 rows of the >=60x20 ledger layout: inline board
 // instead of mini cards, no spare blanks — every number stays on screen.
 func (r *HandReview) compactRows(w int) []string {
-	blank := strings.Repeat(" ", w)
 	rule := theme.Current.Rule.Render(strings.Repeat(theme.G.RuleH, w))
 
 	rows := make([]string, 0, 20)
@@ -183,10 +181,9 @@ func (r *HandReview) compactRows(w int) []string {
 	rows = append(rows, r.seatRows(w)...)   // 3-8
 	rows = append(rows, rule)               // 9
 	rows = append(rows, r.boardLine(w))     // 10
-	rows = append(rows, r.panelRows(w)...)  // 11-14
-	rows = append(rows, rule)               // 15
-	rows = append(rows, r.ledgerRows(w)...) // 16-17
-	rows = append(rows, blank)              // 18
+	rows = append(rows, r.panelRows(w)...)  // 11-15
+	rows = append(rows, rule)               // 16
+	rows = append(rows, r.ledgerRows(w)...) // 17-18
 	rows = append(rows, r.statusRow(w))     // 19
 	rows = append(rows, r.footerRow(w))     // 20
 	return rows
@@ -351,17 +348,20 @@ func (r *HandReview) awardText() string {
 	return strings.Join(parts, dot)
 }
 
-// panelRows is the four-row decision panel — the screen's heart. For a
+// panelRows is the five-row decision panel — the screen's heart. For a
 // decision frame the rows are, per design-learning.md §7:
 //
 //	YOU CALLED 50        Coach: call        Grade: Good   <- what happened + frozen verdict
 //	Then  <frozen coach note, verbatim>                   <- what you knew
-//	Now   <revealed hands, true equity>        hindsight  <- what was true (dimmed, tagged)
+//	Now   <revealed hands>                     hindsight  <- what was true (dimmed, tagged)
+//	      <true equity vs. the price>                     <- the payoff, on its own row
 //	<decision-vs-outcome quadrant line>
 //
-// The frozen line and the hindsight line are separate rows, separate styles,
-// separate sources — that separation is enforced upstream (review package)
-// and preserved here.
+// The hindsight layer gets two rows (docs/ui-review.md F8) so its genuinely
+// new fact — the true equity against the real hands — can never be pushed
+// off the end of a long villain list. The frozen line and the hindsight
+// rows are separate rows, separate styles, separate sources — that
+// separation is enforced upstream (review package) and preserved here.
 func (r *HandReview) panelRows(w int) []string {
 	if d := r.decision(); d != nil {
 		return r.decisionPanel(d, w)
@@ -397,25 +397,31 @@ func (r *HandReview) decisionPanel(d *review.DecisionFrame, w int) []string {
 	}
 	row2 := padStyledTo(" "+th.CoachTitle.Render("Then")+"  "+thenStyle.Render(clip(then, w-8)), w)
 
-	// Row 3: hindsight — dimmed, tagged, and never on the frozen line.
+	// Rows 3-4: hindsight — dimmed, tagged, and never on the frozen line.
+	// The revealed hands take the labeled row; the true equity and its
+	// price comparison — the one number this layer exists to deliver —
+	// get a short row of their own that no villain list can crowd out.
 	tag := "hindsight "
+	villains, truth := r.hindsightRows(d)
 	row3 := rowLR(w,
 		" "+th.CoachTitle.Render("Now")+"   "+
-			th.Help.Render(clip(r.hindsightText(d), w-9-len(tag))),
+			th.Help.Render(clip(villains, w-9-len(tag))),
 		th.Help.Render(tag))
+	row4 := padStyledTo("       "+th.Help.Render(clip(truth, w-8)), w)
 
-	// Row 4: the decision-vs-outcome quadrant — the lesson line.
+	// Row 5: the decision-vs-outcome quadrant — the lesson line.
 	quad := ""
 	if d.Frozen != nil {
 		quad = review.DecisionOutcomeNote(*d.Frozen, r.model.Summary.HeroNetBB)
 	}
-	row4 := padStyledTo(" "+th.Body.Render(clip(quad, w-2)), w)
+	row5 := padStyledTo(" "+th.Body.Render(clip(quad, w-2)), w)
 
-	return []string{row1, row2, row3, row4}
+	return []string{row1, row2, row3, row4, row5}
 }
 
-// resultPanel is the result frame's four rows: what was paid, what the hero
-// netted, which five cards played, and the screen's thesis line.
+// resultPanel is the result frame's five rows: what was paid, what the hero
+// netted, which five cards played, and — set apart by a blank row — the
+// screen's thesis line.
 func (r *HandReview) resultPanel(w int) []string {
 	th := theme.Current
 	o := r.model.Outcome
@@ -444,20 +450,24 @@ func (r *HandReview) resultPanel(w int) []string {
 	}
 	row3 := padStyledTo(" "+th.Body.Render(clip(five, w-2)), w)
 
-	row4 := padStyledTo(" "+th.Help.Render(clip(
+	row4 := strings.Repeat(" ", w)
+
+	row5 := padStyledTo(" "+th.Help.Render(clip(
 		"The result above is variance's column. Your grades are the one you control.", w-2)), w)
 
-	return []string{row1, row2, row3, row4}
+	return []string{row1, row2, row3, row4, row5}
 }
 
-// hindsightText builds the "Now:" sentence: who actually held what, the
-// hero's true equity against it, and the review layer's factual note.
-func (r *HandReview) hindsightText(d *review.DecisionFrame) string {
+// hindsightRows builds the "Now" layer's two texts: who actually held what,
+// then the hero's true equity with the review layer's price comparison. The
+// split keeps the payoff — the true number — on a row short enough to
+// render whole at every breakpoint (docs/ui-review.md F8); the equity text
+// plus the longest note stays inside the compact layout's budget.
+func (r *HandReview) hindsightRows(d *review.DecisionFrame) (villains, truth string) {
 	hs := d.Hindsight
 	if len(hs.VillainHands) == 0 {
-		return "no live opponents left to compare against"
+		return "no live opponents left to compare against", ""
 	}
-	dot := " " + theme.G.Dot + " "
 	parts := make([]string, 0, len(hs.VillainHands))
 	for s := engine.Seat(0); s.Valid(); s++ {
 		hole, ok := hs.VillainHands[s]
@@ -466,14 +476,14 @@ func (r *HandReview) hindsightText(d *review.DecisionFrame) string {
 		}
 		parts = append(parts, r.names[s]+" held "+cardsText(hole[:]))
 	}
-	out := strings.Join(parts, ", ")
+	villains = strings.Join(parts, ", ")
 	if hs.HasEquity {
-		out += dot + "your true equity was " + strconv.Itoa(int(hs.TrueEquity*100+0.5)) + "%"
+		truth = "true equity " + strconv.Itoa(int(hs.TrueEquity*100+0.5)) + "%"
 		if hs.Note != "" {
-			out += dot + hs.Note
+			truth += " " + theme.G.Dot + " " + hs.Note
 		}
 	}
-	return out
+	return villains, truth
 }
 
 // ledgerRows is the two-scoreboard summary, present on every frame. The two

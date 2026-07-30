@@ -79,26 +79,72 @@ func TestHandReviewHindsightIsSeparateAndTagged(t *testing.T) {
 		t.Fatalf("hindsight layer must be tagged:\n%s", view)
 	}
 	if !strings.Contains(view, "held") || !strings.Contains(view, "true equity") {
-		t.Errorf("hindsight line must show the revealed hand and true equity:\n%s", view)
+		t.Errorf("hindsight rows must show the revealed hand and true equity:\n%s", view)
 	}
 
-	var thenLine, nowLine string
+	var thenLine, nowLine, truthLine string
 	for _, line := range strings.Split(view, "\n") {
 		if strings.Contains(line, "Then") && strings.Contains(line, "SENTINEL") {
 			thenLine = line
 		}
-		if strings.Contains(line, "Now") && strings.Contains(line, "true equity") {
+		if strings.Contains(line, "Now") && strings.Contains(line, "held") {
 			nowLine = line
 		}
+		if strings.Contains(line, "true equity") {
+			truthLine = line
+		}
 	}
-	if thenLine == "" || nowLine == "" {
-		t.Fatalf("Then and Now must each render on their own line:\n%s", view)
+	if thenLine == "" || nowLine == "" || truthLine == "" {
+		t.Fatalf("Then, Now and the true-equity row must each render on their own line:\n%s", view)
 	}
 	if strings.Contains(thenLine, "true equity") {
 		t.Error("the frozen Then line must not absorb hindsight numbers")
 	}
-	if strings.Contains(nowLine, "SENTINEL") {
-		t.Error("the hindsight Now line must not absorb the frozen note")
+	for name, line := range map[string]string{"Now": nowLine, "true-equity": truthLine} {
+		if strings.Contains(line, "SENTINEL") {
+			t.Errorf("the hindsight %s row must not absorb the frozen note", name)
+		}
+	}
+}
+
+// TestHandReviewNowContentUnclipped (docs/ui-review.md F8): the hindsight
+// layer's genuinely new facts — who actually held what, and the hero's true
+// equity with its price comparison — render complete, ellipsis-free, at
+// both the full and compact breakpoints. The equity row is the payoff of
+// the whole screen; it must never be the part that gets clipped.
+func TestHandReviewNowContentUnclipped(t *testing.T) {
+	for _, bp := range []struct{ w, h int }{{80, 24}, {60, 20}} {
+		r := buildReview(t, bp.w, bp.h)
+
+		checked := 0
+		for i := range r.model.Decisions {
+			d := &r.model.Decisions[i]
+			if !d.Hindsight.HasEquity {
+				continue
+			}
+			checked++
+			r.cursor = i
+			view := stripANSI(r.View())
+
+			villains, truth := r.hindsightRows(d)
+			if villains == "" || truth == "" {
+				t.Fatalf("%dx%d decision %d: hindsight rows empty", bp.w, bp.h, i)
+			}
+			if !strings.Contains(truth, "true equity") || !strings.Contains(truth, "%") {
+				t.Fatalf("truth row %q must carry the true equity", truth)
+			}
+			if !strings.Contains(view, villains) {
+				t.Errorf("%dx%d decision %d: villain hands clipped, want %q in:\n%s",
+					bp.w, bp.h, i, villains, view)
+			}
+			if !strings.Contains(view, truth) {
+				t.Errorf("%dx%d decision %d: true-equity row clipped, want %q in:\n%s",
+					bp.w, bp.h, i, truth, view)
+			}
+		}
+		if checked == 0 {
+			t.Fatalf("%dx%d: no decision carried hindsight equity — the scenario must exercise the Now rows", bp.w, bp.h)
+		}
 	}
 }
 

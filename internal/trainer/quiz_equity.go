@@ -147,14 +147,10 @@ func genEquityRange(rng *rand.Rand) (Item, bool) {
 // equityExplain places the rule-of-4 arithmetic beside the exact number —
 // the whole point of the drill is closing the gap between the two. Every
 // figure comes from the OutsReport and the equity Result; nothing is
-// authored.
+// authored. The shortcut is spelled by ruleLine (one notation with the
+// coach); the Exact line keeps its decimal on purpose — the drill is the
+// gap between the estimate and the truth.
 func equityExplain(report equity.OutsReport, res equity.Result, boardLen int) string {
-	var rule string
-	if boardLen == 3 {
-		rule = fmt.Sprintf("Rule of 4: %s outs x 4 ~ %.0f%%.", trimFloat(report.Discounted), report.RuleOf4)
-	} else {
-		rule = fmt.Sprintf("Rule of 2: %s outs x 2 ~ %.0f%%.", trimFloat(report.Discounted), report.RuleOf2)
-	}
-	return rule + fmt.Sprintf("\nExact: %.1f%% (win %.1f%%, tie %.1f%%).",
+	return ruleLine(report, boardLen) + fmt.Sprintf(".\nExact: %.1f%% (win %.1f%%, tie %.1f%%).",
 		res.Equity*100, res.Win*100, res.Tie*100)
 }
