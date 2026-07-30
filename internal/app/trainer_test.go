@@ -319,6 +319,39 @@ func TestTrainerFlow(t *testing.T) {
 	}
 }
 
+// TestTrainerMenuResumesLastQuiz: the quiz menu remembers the last quiz
+// practised — the cursor survives the end of a session and the rebuild of
+// the screen model — instead of resetting to the first row every time
+// (docs/ui-review.md F3). Cross-run persistence needs a profile field
+// (none exists yet); this pins the in-memory behaviour.
+func TestTrainerMenuResumesLastQuiz(t *testing.T) {
+	trainerResumeKind = -1
+	t.Cleanup(func() { trainerResumeKind = -1 })
+
+	tr := testTrainerScreen(t, 80, 24)
+	if tr.list.Cursor() != 0 {
+		t.Fatalf("nothing practised yet: cursor %d, want 0", tr.list.Cursor())
+	}
+	tr.list.cursor = int(trainer.QuizEquity)
+	tr.handleAction(ActSelect)
+	if tr.state != trainerAsking {
+		t.Fatal("selecting a quiz should start it")
+	}
+	tr.handleAction(ActBack) // end the quiz, back to the menu
+	if got := tr.list.Cursor(); got != int(trainer.QuizEquity) {
+		t.Errorf("after a session the cursor reset to %d, want the equity row %d",
+			got, int(trainer.QuizEquity))
+	}
+
+	// A rebuilt screen model (a later navigation constructs Trainer anew)
+	// starts on the same quiz.
+	fresh := testTrainerScreen(t, 80, 24)
+	if got := fresh.list.Cursor(); got != int(trainer.QuizEquity) {
+		t.Errorf("rebuilt trainer cursor %d, want the last practised quiz %d",
+			got, int(trainer.QuizEquity))
+	}
+}
+
 // TestTrainerTimerTicks: the clock advances only while a timed session is
 // live — rankings ticks, outs does not, and the menu never does.
 func TestTrainerTimerTicks(t *testing.T) {

@@ -117,7 +117,16 @@ type Trainer struct {
 	height int
 }
 
-// NewTrainer builds the trainer on its quiz menu.
+// trainerResumeKind remembers the last quiz kind the player started, so a
+// rebuilt trainer screen puts the menu cursor back on it instead of
+// resetting to the top (docs/ui-review.md F3). In-memory only: the profile
+// has no field for it — a persisted `LastQuiz string` on profile.Profile
+// would make this survive restarts; until one exists, this covers model
+// rebuilds within a run. -1 means "never started a quiz".
+var trainerResumeKind = -1
+
+// NewTrainer builds the trainer on its quiz menu, with the cursor on the
+// last quiz kind practised (this run) rather than always on the first.
 func NewTrainer(prof *profile.Profile, prefs *Prefs) *Trainer {
 	t := &Trainer{
 		prof:   prof,
@@ -126,6 +135,9 @@ func NewTrainer(prof *profile.Profile, prefs *Prefs) *Trainer {
 		seed:   func() int64 { return time.Now().UnixNano() },
 	}
 	t.refreshMenu()
+	if trainerResumeKind >= 0 && trainerResumeKind < int(trainer.NumQuizKinds) {
+		t.list.cursor = trainerResumeKind
+	}
 	return t
 }
 
@@ -146,7 +158,17 @@ func (t *Trainer) refreshMenu() {
 		})
 	}
 	rows = append(rows, listRow{Label: "Back", Detail: "Return to the main menu"})
+	// Rebuilding must not reset the cursor: after a session ends, the menu
+	// comes back with the cursor on the quiz just practised, so "practice the
+	// next skill" never requires re-navigation.
+	cursor := 0
+	if t.list != nil {
+		cursor = t.list.cursor
+	}
 	t.list = newFormList(rows)
+	if cursor > 0 && cursor < len(rows) {
+		t.list.cursor = cursor
+	}
 }
 
 // Init implements tea.Model.
@@ -245,6 +267,7 @@ func (t *Trainer) menuAction(a KeyAction) (tea.Cmd, bool) {
 
 // begin starts a fresh session of a kind at the profile's current level.
 func (t *Trainer) begin(kind trainer.QuizKind) tea.Cmd {
+	trainerResumeKind = int(kind)
 	t.session = trainer.NewSessionSeeded(kind, t.prof, t.seed())
 	t.state = trainerAsking
 	t.outcome = nil

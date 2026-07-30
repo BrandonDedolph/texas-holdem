@@ -132,6 +132,42 @@ func TestLessonsResumeAtFirstIncomplete(t *testing.T) {
 	}
 }
 
+// TestLessonsCursorAdvancesAfterCompletion: closing a lesson that was just
+// completed lands the cursor on the newly unlocked lesson, not the one just
+// finished — while closing a revisited (already-complete) lesson leaves the
+// cursor where it was (docs/ui-review.md F3).
+func TestLessonsCursorAdvancesAfterCompletion(t *testing.T) {
+	l, p := newLessonsScreen(t, 80, 24)
+	lessons := l.reg.All()
+	if l.cursor != 0 {
+		t.Fatalf("fresh curriculum should start on lesson 1, cursor %d", l.cursor)
+	}
+
+	if !l.Open(lessons[0].ID) {
+		t.Fatal("lesson 1 should open on a fresh profile")
+	}
+	// Completion is recorded on the profile (in real flow by the lesson
+	// view's Progress.Record); the list re-reads the profile on close.
+	p.CompleteLesson(lessons[0].ID)
+	l.handleAction(ActBack)
+	if l.view != nil {
+		t.Fatal("esc should close the lesson view")
+	}
+	if got := lessons[l.cursor].ID; got != lessons[1].ID {
+		t.Errorf("after completing lesson 1 the cursor is on %q, want %q", got, lessons[1].ID)
+	}
+
+	// Revisiting the completed lesson and closing it must not yank the
+	// cursor forward.
+	if !l.Open(lessons[0].ID) {
+		t.Fatal("a completed lesson should reopen")
+	}
+	l.handleAction(ActBack)
+	if l.cursor != 0 {
+		t.Errorf("closing a revisited lesson moved the cursor to %d, want 0", l.cursor)
+	}
+}
+
 // TestCompletedLessonShowsCheckmark: completion state renders as the good
 // glyph and counts in the subtitle.
 func TestCompletedLessonShowsCheckmark(t *testing.T) {

@@ -33,6 +33,11 @@ type Lessons struct {
 	cursor int
 	view   *lessonView // non-nil while a lesson is open
 
+	// openedComplete records whether the open lesson was already complete
+	// when it was opened, so closing it can tell "just finished" (advance
+	// the cursor to the newly unlocked lesson) from "revisited" (stay put).
+	openedComplete bool
+
 	help          helpOverlay
 	width, height int
 }
@@ -81,6 +86,7 @@ func (l *Lessons) Open(id string) bool {
 			l.cursor = i
 		}
 	}
+	l.openedComplete = lesson.Completed(l.prof)
 	l.view = newLessonView(lesson, l.prof)
 	return true
 }
@@ -120,7 +126,14 @@ func (l *Lessons) handleAction(a KeyAction) (tea.Cmd, bool) {
 		if outcome == lessonClose {
 			// Re-read progress: the closed lesson may have completed, which
 			// changes checkmarks, unlocks, and the resume position.
+			justFinished := !l.openedComplete && l.view.lesson.Completed(l.prof)
 			l.view = nil
+			if justFinished {
+				// Land the cursor on the newly unlocked lesson, not the one
+				// just finished — the list must point forward at exactly the
+				// moment the player follows its path (docs/ui-review.md F3).
+				l.cursor = l.resumeIndex()
+			}
 		}
 		return nil, handled
 	}
