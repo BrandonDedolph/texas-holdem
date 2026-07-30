@@ -38,7 +38,7 @@ const (
 // MiniCard renders a face-up 5x3 card with rounded corners:
 //
 //	+---+
-//	[As ]  or  [10s]   (Unicode: rounded box drawing, the suit a glyph)
+//	[ As]  or  [10s]   (Unicode: rounded box drawing, the suit a glyph)
 //	+---+
 func MiniCard(c engine.Card) string {
 	interior := theme.Current.CardBorder.Render(padCell("??", miniInterior))
@@ -55,10 +55,14 @@ func CardFace(c engine.Card) string {
 	return c.Rank().Symbol() + theme.SuitGlyph(c.Suit())
 }
 
-// padCell pads plain text with trailing spaces to exactly w display cells.
+// padCell pads plain text to exactly w display cells, with the spare cell
+// on the LEFT so the suit glyph lands in the same column on every card.
+// A ten fills the interior; everything shorter would otherwise shunt its
+// suit one column left, and a row of cards would show a ragged line of
+// suits instead of a clean one.
 func padCell(s string, w int) string {
 	if gap := w - lipgloss.Width(s); gap > 0 {
-		return s + strings.Repeat(" ", gap)
+		return strings.Repeat(" ", gap) + s
 	}
 	return s
 }
