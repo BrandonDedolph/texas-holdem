@@ -33,9 +33,9 @@ func init() {
 			{
 				Kind:  tutorial.SectionVisual,
 				Title: "Nine spades to glory",
-				Text: "You hold 9s 8s on As Ks 2h: four spades, needing one more. " +
-					"Thirteen spades exist, you can see four — nine remain. Every one " +
-					"of them makes you a flush that beats anything one pair can do.",
+				Text: "You hold 9s 8s on this ace-king flop: four spades, needing one " +
+					"more. Thirteen spades exist, you can see four — nine remain. Every " +
+					"one of them makes you a flush that beats anything one pair can do.",
 				Visual: &tutorial.Visual{
 					Board: &tutorial.VisualBoard{
 						Board:    engine.MustCards("As Ks 2h"),

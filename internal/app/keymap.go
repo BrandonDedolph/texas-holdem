@@ -155,6 +155,8 @@ var (
 	quickRefKeys = KeyMap{
 		Binding{ActLeft, []string{"left", "h"}, "left/h", "previous tab"},
 		Binding{ActRight, []string{"right", "l"}, "right/l", "next tab"},
+		Binding{ActUp, []string{"up", "k"}, "up/k", "scroll up"},
+		Binding{ActDown, []string{"down", "j"}, "down/j", "scroll down"},
 		Binding{ActTab1, []string{"1"}, "1", "hand rankings"},
 		Binding{ActTab2, []string{"2"}, "2", "positions"},
 		Binding{ActTab3, []string{"3"}, "3", "pot odds"},

@@ -78,7 +78,8 @@ func init() {
 						Choices: []string{"Player A", "Player B", "Split pot"},
 						Correct: 1,
 					},
-					Explain: "Player B pairs the board: a pair of sevens (7h 7d Qs Jh 8h). " +
+					Explain: "Player B pairs the board: the 7h matches the board's 7d for " +
+						"a pair of sevens, filled out with the three best side cards. " +
 						"Player A has no pair at all — ace-king high is a strong START, but " +
 						"it finished as high card, and any pair beats it. Big cards lose to " +
 						"small pairs all day; the ladder doesn't care how pretty the losers are.",

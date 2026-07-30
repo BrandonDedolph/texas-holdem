@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/BrandonDedolph/texas-holdem/internal/engine"
+	"github.com/BrandonDedolph/texas-holdem/internal/tutorial"
 	"github.com/BrandonDedolph/texas-holdem/internal/ui/components"
 	"github.com/BrandonDedolph/texas-holdem/internal/ui/theme"
 	tea "github.com/charmbracelet/bubbletea"
@@ -42,11 +43,18 @@ func (t refTab) String() string {
 // rules dump: hand rankings render with real cards, and the pot-odds table
 // is phrased as the decision a player actually faces ("they bet half pot —
 // call if you win more than 25%").
+//
+// A panel taller than the content budget scrolls (the rankings tab's ten
+// drawn hands are 30 rows); the status row announces cropped content with
+// the same cue the lesson view uses, so nothing is ever silently cut.
 type QuickReference struct {
 	active refTab
 	help   helpOverlay
 	width  int
 	height int
+
+	scroll    int
+	maxScroll int // set by the last render; scrolling is display-bounded
 }
 
 // NewQuickReference builds the reference on the rankings tab.
@@ -74,27 +82,43 @@ func (q *QuickReference) keymap() KeyMap { return quickRefKeys }
 func (q *QuickReference) handleAction(a KeyAction) (tea.Cmd, bool) {
 	switch a {
 	case ActLeft:
-		q.active = (q.active + tabCount - 1) % tabCount
+		q.setTab((q.active + tabCount - 1) % tabCount)
 		return nil, true
 	case ActRight:
-		q.active = (q.active + 1) % tabCount
+		q.setTab((q.active + 1) % tabCount)
 		return nil, true
 	case ActTab1:
-		q.active = tabRankings
+		q.setTab(tabRankings)
 		return nil, true
 	case ActTab2:
-		q.active = tabPositions
+		q.setTab(tabPositions)
 		return nil, true
 	case ActTab3:
-		q.active = tabPotOdds
+		q.setTab(tabPotOdds)
 		return nil, true
 	case ActTab4:
-		q.active = tabGlossary
+		q.setTab(tabGlossary)
+		return nil, true
+	case ActUp:
+		if q.scroll > 0 {
+			q.scroll--
+		}
+		return nil, true
+	case ActDown:
+		if q.scroll < q.maxScroll {
+			q.scroll++
+		}
 		return nil, true
 	case ActBack:
 		return Navigate(ScreenMainMenu), true
 	}
 	return nil, false
+}
+
+// setTab switches panels and rewinds the scroll — each tab starts at its top.
+func (q *QuickReference) setTab(t refTab) {
+	q.active = t
+	q.scroll, q.maxScroll = 0, 0
 }
 
 // View implements tea.Model, in the shared chrome. The tab bar is the first
@@ -118,17 +142,56 @@ func (q *QuickReference) View() string {
 	case tabGlossary:
 		panel = q.renderGlossary()
 	}
+	// Scrolling: the content budget is h-4 (the shell), minus the tab bar
+	// and its blank line. A panel taller than that scrolls; maxScroll is
+	// derived from what actually rendered, so the handler can never scroll
+	// the content out of sight.
+	lines := strings.Split(panel, "\n")
+	avail := h - 6
+	q.maxScroll = len(lines) - avail
+	if q.maxScroll < 0 {
+		q.maxScroll = 0
+	}
+	if q.scroll > q.maxScroll {
+		q.scroll = q.maxScroll
+	}
+	panel = strings.Join(lines[q.scroll:], "\n")
+
 	// The panel block keeps one width across tabs so the horizontal
 	// centering cannot shift the left edge when the player switches.
 	panel = padBlock(panel, quickRefPanelWidth)
 	content := lipgloss.PlaceHorizontal(quickRefPanelWidth, lipgloss.Center, q.renderTabBar()) +
 		"\n\n" + panel
 
+	dot := " " + theme.G.Dot + " "
+	footer := "left/right tabs" + dot + "1-4 jump" + dot + "esc back"
+	if q.maxScroll > 0 {
+		// The scroll keys displace the jump hint: the legend must fit the
+		// 60-column compact floor, and the help overlay still documents 1-4.
+		footer = "up/down scroll" + dot + "left/right tabs" + dot + "esc back"
+	}
 	return renderShell(w, h, shell{
 		Title:  "Quick Reference",
-		Status: q.tabSummary(),
-		Footer: "left/right tabs " + theme.G.Dot + " 1-4 jump " + theme.G.Dot + " esc back",
+		Status: q.statusText(),
+		Footer: footer,
 	}, content)
+}
+
+// statusText is the scroll cue when content is cropped, the tab summary
+// otherwise — content the reader cannot see outranks anything else the
+// line has to say (the lesson view's rule, applied here).
+func (q *QuickReference) statusText() string {
+	dot := " " + theme.G.Dot + " "
+	switch {
+	case q.maxScroll <= 0:
+		return q.tabSummary()
+	case q.scroll == 0:
+		return "more below" + dot + "up/down to scroll"
+	case q.scroll >= q.maxScroll:
+		return "more above" + dot + "up/down to scroll"
+	default:
+		return "more above and below" + dot + "up/down to scroll"
+	}
 }
 
 // quickRefPanelWidth is the fixed width every tab panel is padded to; the
@@ -171,56 +234,41 @@ func (q *QuickReference) renderTabBar() string {
 	return lipgloss.JoinHorizontal(lipgloss.Center, parts...)
 }
 
-// inlineCards renders a card list ("As Ks Qs") through components.InlineCard
-// so reference examples look exactly like cards on the table. The card
-// strings live in content as text per the repo convention — cards in lesson
-// content are written "As Kd", never raw values.
-func inlineCards(cards string) string {
-	parsed, err := engine.ParseCards(cards)
-	if err != nil {
-		// Reference content is static; a typo here is a programmer error
-		// caught the first time any test renders the panel.
-		panic("quick_reference: bad card list " + cards + ": " + err.Error())
-	}
-	out := make([]string, len(parsed))
-	for i, c := range parsed {
-		out[i] = components.InlineCard(c)
-	}
-	return strings.Join(out, " ")
+// rankingNotes is the one-phrase identity of each tier, indexed like
+// tutorial.LadderRungs — the example hands themselves come from the ladder,
+// so the reference and lesson 1 can never disagree on what illustrates what
+// (the ladder's examples are verified against the evaluator by test).
+var rankingNotes = [...]string{
+	"the best hand",
+	"run of one suit",
+	"\"quads\"",
+	"trips + a pair",
+	"five of one suit",
+	"five in a row",
+	"\"trips\", \"a set\"",
+	"top pair wins ties",
+	"kickers break ties",
+	"no made hand",
 }
 
-// renderRankings draws the ten hand categories, strongest first, each with
-// a real example hand — reading "full house" next to J♠ J♦ J♥ 4♣ 4♦ builds
-// the pattern recognition a text list never will.
+// renderRankings draws the ten hand categories, strongest first, each
+// example hand DRAWN as five mini cards — the tier's name and note ride the
+// rows beside its cards. Seeing "Full House" next to five real cards builds
+// the pattern recognition an inline list of codes never will. Ten 3-row
+// tiers make the panel 30 rows; the View scrolls it with a cue.
 func (q *QuickReference) renderRankings() string {
 	th := theme.Current
-	rows := []struct {
-		name  string
-		cards string
-		note  string
-	}{
-		{"Royal Flush", "As Ks Qs Js Ts", "the best hand"},
-		{"Straight Flush", "9h 8h 7h 6h 5h", "run of one suit"},
-		{"Four of a Kind", "Qc Qd Qh Qs 7d", "\"quads\""},
-		{"Full House", "Js Jd Jh 4c 4d", "trips + a pair"},
-		{"Flush", "Ad Jd 8d 6d 2d", "five of one suit"},
-		{"Straight", "8c 7d 6s 5h 4c", "five in a row"},
-		{"Three of a Kind", "9s 9h 9c Kd 2s", "\"trips\", \"a set\""},
-		{"Two Pair", "Ah Ac 8d 8s Qc", "top pair wins ties"},
-		{"One Pair", "Td Tc As 7h 3c", "kickers break ties"},
-		{"High Card", "As Qd 9c 6h 2s", "no made hand"},
-	}
-	var b strings.Builder
-	for i, r := range rows {
+	var out []string
+	for i, r := range tutorial.LadderRungs() {
 		num := padRow(itoa2(i+1)+".", 4)
-		name := padRow(r.name, 16)
-		b.WriteString(th.Body.Render(num) + th.Header.Render(name) +
-			inlineCards(r.cards) + "  " + th.Help.Render(r.note))
-		if i < len(rows)-1 {
-			b.WriteString("\n")
-		}
+		margin := strings.Repeat(" ", len(num))
+		rows := strings.Split(components.MiniCards(engine.MustCards(r.Cards)...), "\n")
+		out = append(out,
+			margin+rows[0],
+			th.Body.Render(num)+rows[1]+"  "+th.Header.Render(r.Name),
+			margin+rows[2]+"  "+th.Help.Render(rankingNotes[i]))
 	}
-	return b.String()
+	return strings.Join(out, "\n")
 }
 
 // itoa2 formats a small positive int, right-aligned to two cells so the

@@ -169,6 +169,9 @@ func TestQuickReferenceLayoutStable(t *testing.T) {
 				"cycle right":   func() { q.handleAction(ActRight) }, // wraps to rankings
 				"cycle left":    func() { q.handleAction(ActLeft) },  // back to glossary
 				"rankings tab":  func() { q.handleAction(ActTab1) },
+				"scroll down":   func() { q.handleAction(ActDown) },
+				"scroll again":  func() { q.handleAction(ActDown) },
+				"scroll up":     func() { q.handleAction(ActUp) },
 			})
 	}
 }

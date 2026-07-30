@@ -67,6 +67,23 @@ func padCell(s string, w int) string {
 	return s
 }
 
+// MiniCardEmphasis renders a face-up 5x3 card in the double-border emphasis
+// frame - the mini counterpart of FullCard's highlight form, for compact
+// layouts that still need to say "these cards play".
+func MiniCardEmphasis(c engine.Card) string {
+	border := theme.Current.CardWinner
+	interior := border.Render(padCell("??", miniInterior))
+	if c.Valid() {
+		interior = theme.SuitStyle(c.Suit()).Render(padCell(CardFace(c), miniInterior))
+	}
+	g := theme.G
+	rail := strings.Repeat(g.CardDblH, miniInterior)
+	top := border.Render(g.CardDblTL + rail + g.CardDblTR)
+	mid := border.Render(g.CardDblV) + interior + border.Render(g.CardDblV)
+	bottom := border.Render(g.CardDblBL + rail + g.CardDblBR)
+	return top + "\n" + mid + "\n" + bottom
+}
+
 // MiniCardBack renders a face-down 5x3 card.
 func MiniCardBack() string {
 	return miniCardFrame(theme.Current.CardBack.Render(theme.G.FaceDown))
@@ -125,11 +142,21 @@ func InlineCardSlot(c engine.Card) string {
 // placeholder pips. The result is always exactly 3 rows tall and the same
 // width for 0, 3, 4 or 5 dealt cards. Cards beyond the fifth are ignored.
 func BoardRow(dealt []engine.Card) string {
+	return BoardRowHighlight(dealt, 0)
+}
+
+// BoardRowHighlight is BoardRow with the highlighted cards drawn in the
+// emphasis frame - the compact form of FullBoardRow's annotation, so "the
+// five that play" survives the 3-row breakpoint.
+func BoardRowHighlight(dealt []engine.Card, highlight engine.CardSet) string {
 	slots := make([]string, BoardSlots)
 	for i := range slots {
-		if i < len(dealt) {
+		switch {
+		case i < len(dealt) && highlight.Has(dealt[i]):
+			slots[i] = MiniCardEmphasis(dealt[i])
+		case i < len(dealt):
 			slots[i] = MiniCard(dealt[i])
-		} else {
+		default:
 			slots[i] = boardPlaceholder()
 		}
 	}
