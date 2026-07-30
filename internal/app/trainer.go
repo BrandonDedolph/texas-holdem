@@ -176,6 +176,11 @@ func (t *Trainer) refreshMenu() {
 		})
 	}
 	rows = append(rows, listRow{Label: "Back", Detail: "Return to the main menu"})
+	t.installMenu(rows)
+}
+
+// installMenu swaps in a rebuilt row set, preserving the cursor.
+func (t *Trainer) installMenu(rows []listRow) {
 	// Rebuilding must not reset the cursor: after a session ends, the menu
 	// comes back with the cursor on the quiz just practised, so "practice the
 	// next skill" never requires re-navigation.
@@ -435,40 +440,37 @@ func (t *Trainer) View() string {
 	}
 }
 
+// viewMenu draws the quiz list over the skill ladder: the list picks a
+// drill, the ladder underneath shows what the selected drill's levels mean
+// and how close the next unlock is — the mechanism, not just "level 1/3"
+// (docs/ui-review.md §5.6, F12).
 func (t *Trainer) viewMenu(w, h int) string {
-	th := theme.Current
-	title := th.Title.Render("Trainer")
-	// Width(56)/Render(50) matches Settings: the box stays inside the 60
-	// column compact floor with the frame's border around it.
-	box := th.ContentBox.Padding(0, 2).Width(56).Render(t.list.Render(50))
-	hint := th.Help.Render("up/down move " + theme.G.Dot + " enter start " +
-		theme.G.Dot + " esc back")
-	return frame(w, h, title+"\n"+box+"\n"+hint)
+	content := "\n" + t.list.Render(formListWidth) + "\n\n" +
+		t.renderLadder(formListWidth)
+	return renderShell(w, h, shell{
+		Title:  "Trainer",
+		Status: t.list.Detail(),
+		Footer: "up/down move " + theme.G.Dot + " enter start " +
+			theme.G.Dot + " esc back",
+	}, content)
 }
 
-// viewQuiz lays out the fixed rows: title, status, question panel, footer.
-// The panel is top-anchored so flipping between question and feedback never
-// moves the chrome.
+// viewQuiz draws a live question in the shared chrome: the drill and level
+// in the header, the fixed-budget question panel top-anchored in the
+// content region, and the running score on the status row.
 func (t *Trainer) viewQuiz(w, h int) string {
-	th := theme.Current
 	compact := layoutFor(w, h) == LayoutCompact
 	qw := 72
 	if compact {
 		qw = 56
 	}
-
-	title := lipgloss.PlaceHorizontal(w, lipgloss.Center,
-		th.Header.Render(fmt.Sprintf("Trainer: %s (level %d)", t.session.Kind.Title(), t.session.Level)))
-	status := padRow("  "+t.statusText(), w)
-	footer := lipgloss.PlaceHorizontal(w, lipgloss.Center, th.Help.Render(t.footerText()))
-
-	panel := t.renderQuestion(qw, compact)
-	contentHeight := h - 3
-	content := padHeight(
-		lipgloss.Place(w, contentHeight, lipgloss.Center, lipgloss.Top, panel),
-		contentHeight)
-
-	return title + "\n" + th.StatusLine.Render(status) + "\n" + content + "\n" + footer
+	return renderShell(w, h, shell{
+		Title: "Trainer " + theme.G.Dot + " " + t.session.Kind.Title(),
+		HeaderRight: fmt.Sprintf("level %d/%d",
+			t.session.Level, trainer.MaxLevel),
+		Status: t.statusText(),
+		Footer: t.footerText(),
+	}, t.renderQuestion(qw, compact))
 }
 
 // statusText is the fixed-width progress line: question number, streak and
@@ -494,14 +496,80 @@ func (t *Trainer) footerText() string {
 	dot := " " + theme.G.Dot + " "
 	switch t.state {
 	case trainerFeedback:
-		return "space next" + dot + "esc end quiz" + dot + "? help"
+		return "space next" + dot + "esc end quiz"
 	default:
 		if it := t.currentItem(); it != nil {
 			if a, ok := it.Drill.Answer.(tutorial.ChoiceAnswer); ok {
-				return fmt.Sprintf("1-%d answer", len(a.Choices)) + dot + "esc end quiz" + dot + "? help"
+				return fmt.Sprintf("1-%d answer", len(a.Choices)) + dot + "esc end quiz"
 			}
 		}
-		return "type a number, enter submits" + dot + "esc end quiz" + dot + "? help"
+		return "type a number, enter submits" + dot + "esc end quiz"
+	}
+}
+
+// --- Skill ladder --------------------------------------------------------------
+
+// trainerLadderRows is the ladder's fixed row budget: a heading, one row
+// per level, and the unlock-progress line. Always occupied (blank on the
+// Back row) so cursor movement never reflows the menu.
+const trainerLadderRows = trainer.MaxLevel + 2
+
+// renderLadder draws the selected quiz kind's level ladder: every level
+// with what it drills, the current level marked, and how far the gate skill
+// is from unlocking the next (docs/ui-review.md §5.6). The thresholds
+// quoted come from the same profile constants that enforce them.
+func (t *Trainer) renderLadder(width int) string {
+	cursor := t.list.Cursor()
+	if cursor >= int(trainer.NumQuizKinds) {
+		return padHeight("", trainerLadderRows)
+	}
+	th := theme.Current
+	kind := trainer.QuizKind(cursor)
+	lvl := trainer.Level(t.prof, kind)
+
+	// The two-space indent matches the MenuItem styles' built-in left
+	// padding, so the ladder's left edge aligns with the list rows above.
+	indent := "  "
+	lines := make([]string, 0, trainerLadderRows)
+	lines = append(lines, indent+th.CoachTitle.Render(padRow("SKILL LADDER", width)))
+	for l := 1; l <= trainer.MaxLevel; l++ {
+		row := fmt.Sprintf("%d  %s", l, trainer.LevelBlurb(kind, l))
+		switch {
+		case l < lvl:
+			lines = append(lines, indent+th.GradeGood.Render(theme.G.Good+" ")+
+				th.Help.Render(padRow(row, width-2)))
+		case l == lvl:
+			lines = append(lines, indent+th.MenuItemSelected.UnsetPaddingLeft().Render(
+				padRow("> "+row, width)))
+		default:
+			lines = append(lines, indent+th.Help.Render(padRow(theme.G.Dot+" "+row, width)))
+		}
+	}
+	lines = append(lines, indent+th.Help.Render(padRow(trainerUnlockLine(t.prof, kind), width)))
+	return padHeight(strings.Join(lines, "\n"), trainerLadderRows)
+}
+
+// trainerUnlockLine states the next unlock and the live progress toward it,
+// from the gate skill's real EMA and attempt count. Nothing here is
+// invented: the numbers are profile.SkillStat's and the thresholds are the
+// ones UnlockReady enforces.
+func trainerUnlockLine(prof *profile.Profile, kind trainer.QuizKind) string {
+	lvl := trainer.Level(prof, kind)
+	stat := trainer.GateStat(prof, kind)
+	dot := " " + theme.G.Dot + " "
+	gate := fmt.Sprintf("level %d unlocks at %d%% over %d",
+		lvl+1, int(profile.UnlockEMA*100), profile.UnlockAttempts)
+	now := fmt.Sprintf("now %d%% over %d", int(stat.EMA*100+0.5), stat.Attempts)
+	switch {
+	case lvl >= trainer.MaxLevel:
+		if stat.Attempts == 0 {
+			return "top level"
+		}
+		return "top level" + dot + now
+	case stat.Attempts == 0:
+		return gate + " answers"
+	default:
+		return gate + dot + now
 	}
 }
 
@@ -655,25 +723,37 @@ func (t *Trainer) renderFeedback(qw int) string {
 	return verdict + "\n" + th.Body.Width(qw).Render(body)
 }
 
+// viewSummary closes the session in the shared chrome. The last line is
+// the ladder speaking: either the level-up it just earned, or the live
+// distance to the next unlock — the summary always says what the session
+// moved, not just what it scored (docs/ui-review.md §5.6).
 func (t *Trainer) viewSummary(w, h int) string {
 	th := theme.Current
 	s := t.session
+
+	progress := trainerUnlockLine(t.prof, s.Kind)
+	style := th.Help
+	if s.LeveledUp {
+		progress = fmt.Sprintf("Level up! %s is now level %d.",
+			s.Kind.Title(), trainer.Level(t.prof, s.Kind))
+		style = th.CoachTitle
+	}
 	lines := []string{
-		th.Title.Render("Session Complete"),
-		th.Header.Render(fmt.Sprintf("%s (level %d)", s.Kind.Title(), s.Level)),
+		"",
+		th.Header.Render("Session Complete"),
 		"",
 		th.Body.Render(fmt.Sprintf("Correct %d/%d   Accuracy %.0f%%   Score %s",
 			s.Correct, s.Answered, s.Accuracy()*100, trainerScore(s.Score))),
 		th.Body.Render(fmt.Sprintf("Best streak %d", s.BestStreak)),
+		"",
+		style.Render(progress),
 	}
-	if s.LeveledUp {
-		lines = append(lines, th.CoachTitle.Render(
-			fmt.Sprintf("Level up! %s is now level %d.", s.Kind.Title(), trainer.Level(t.prof, s.Kind))))
-	} else {
-		lines = append(lines, "")
-	}
-	lines = append(lines, "", th.Help.Render("enter again "+theme.G.Dot+" esc quiz menu"))
-	return frame(w, h, strings.Join(lines, "\n"))
+	return renderShell(w, h, shell{
+		Title: "Trainer " + theme.G.Dot + " " + s.Kind.Title(),
+		HeaderRight: fmt.Sprintf("level %d/%d",
+			trainer.Level(t.prof, s.Kind), trainer.MaxLevel),
+		Footer: "enter again " + theme.G.Dot + " esc quiz menu",
+	}, padBlock(strings.Join(lines, "\n"), formListWidth))
 }
 
 // trainerScore renders the score without trailing zeros ("7.5", "9").

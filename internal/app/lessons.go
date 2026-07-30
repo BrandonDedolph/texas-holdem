@@ -72,13 +72,21 @@ func (l *Lessons) resumeIndex() int {
 	return 0
 }
 
+// unlocked reports whether a lesson is enterable: its prerequisites are
+// complete, or the profile's "Lesson locks: All open" setting has lifted
+// every gate (docs/ui-review.md §5.4). Every gate in this screen goes
+// through here so the setting cannot half-apply.
+func (l *Lessons) unlocked(lesson *tutorial.Lesson) bool {
+	return l.prof.UnlockAllLessons || lesson.Unlocked(l.prof)
+}
+
 // Open opens a lesson by ID, honouring prerequisite gating: a locked lesson
 // does not open and the list's detail line already states why. It reports
 // whether the lesson opened. App routing calls this for a LessonRequest
 // payload; the list's enter key goes through the same gate.
 func (l *Lessons) Open(id string) bool {
 	lesson, ok := l.reg.Get(id)
-	if !ok || !lesson.Unlocked(l.prof) {
+	if !ok || !l.unlocked(lesson) {
 		return false
 	}
 	for i, cand := range l.reg.All() {
@@ -185,37 +193,32 @@ func (l *Lessons) View() string {
 // padded to it so cursor movement can never shift a column.
 const lessonListWidth = 46
 
-// renderList draws the curriculum: title, progress, the 13 rows, and a
-// detail line for the selected lesson. The compact breakpoint drops the
-// subtitle and spacer rows so all 13 lessons still fit a 60x20 frame.
+// renderList draws the curriculum in the shared chrome: the completion
+// count rides the header's context slot, the 13 rows are the content, and
+// the selected lesson's detail (its goal, or exactly why it is locked) is
+// the status row. All 13 rows fit every breakpoint's h-4 content budget,
+// so there is no compact special case to drift.
 func (l *Lessons) renderList(w, h int) string {
-	th := theme.Current
 	lessons := l.reg.All()
-	compact := layoutFor(w, h) == LayoutCompact
 	dot := " " + theme.G.Dot + " "
 
-	lines := []string{th.Title.Render("Lessons")}
-	if !compact {
-		done := 0
-		for _, lesson := range lessons {
-			if lesson.Completed(l.prof) {
-				done++
-			}
+	done := 0
+	for _, lesson := range lessons {
+		if lesson.Completed(l.prof) {
+			done++
 		}
-		lines = append(lines,
-			th.Subtitle.Render(strconv.Itoa(done)+" of "+strconv.Itoa(len(lessons))+" complete"),
-			"")
 	}
+	rows := make([]string, 0, len(lessons)+1)
+	rows = append(rows, "")
 	for i, lesson := range lessons {
-		lines = append(lines, l.lessonRow(i, lesson))
+		rows = append(rows, l.lessonRow(i, lesson))
 	}
-	if !compact {
-		lines = append(lines, "")
-	}
-	lines = append(lines, th.Help.Render(padRow(l.detailLine(), lessonListWidth)))
-	lines = append(lines, th.Help.Render(padRow(
-		"up/down move"+dot+"enter open"+dot+"esc back"+dot+"? help", lessonListWidth)))
-	return frame(w, h, strings.Join(lines, "\n"))
+	return renderShell(w, h, shell{
+		Title:       "Lessons",
+		HeaderRight: strconv.Itoa(done) + " of " + strconv.Itoa(len(lessons)) + " complete",
+		Status:      l.detailLine(),
+		Footer:      "up/down move" + dot + "enter open" + dot + "esc back",
+	}, strings.Join(rows, "\n"))
 }
 
 // lessonRow renders one curriculum row at exactly lessonListWidth cells:
@@ -225,7 +228,7 @@ func (l *Lessons) renderList(w, h int) string {
 func (l *Lessons) lessonRow(i int, lesson *tutorial.Lesson) string {
 	th := theme.Current
 	done := lesson.Completed(l.prof)
-	locked := !lesson.Unlocked(l.prof)
+	locked := !l.unlocked(lesson)
 
 	// The MenuItem styles carry a built-in left padding for whole-row
 	// rendering (formList's convention); this row is composed from styled
@@ -271,7 +274,7 @@ func (l *Lessons) detailLine() string {
 	lesson := lessons[l.cursor]
 	dot := " " + theme.G.Dot + " "
 	switch {
-	case !lesson.Unlocked(l.prof):
+	case !l.unlocked(lesson):
 		return "Locked" + dot + l.lockReason(lesson)
 	case lesson.Completed(l.prof):
 		return "Completed" + dot + lesson.Goal

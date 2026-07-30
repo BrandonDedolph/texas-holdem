@@ -7,6 +7,7 @@ import (
 	"github.com/BrandonDedolph/texas-holdem/internal/profile"
 	"github.com/BrandonDedolph/texas-holdem/internal/trainer"
 	"github.com/BrandonDedolph/texas-holdem/internal/tutorial"
+	"github.com/BrandonDedolph/texas-holdem/internal/ui/theme"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -401,5 +402,76 @@ func TestTrainerRemembersQuizAcrossRestarts(t *testing.T) {
 	prof.LastQuiz = "no-such-quiz"
 	if got := NewTrainer(prof, DefaultPrefs()).list.cursor; got != 0 {
 		t.Errorf("unknown LastQuiz should fall back to the first quiz, got cursor %d", got)
+	}
+}
+
+// TestTrainerMenuShowsSkillLadder (docs/ui-review.md §5.6): the menu shows
+// the selected kind's ladder — what every level drills, the current level
+// marked, and the real gate-stat progress toward the next unlock.
+func TestTrainerMenuShowsSkillLadder(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	prof := profile.NewProfile()
+	// Gate skill mid-climb at level 2 (0-based Level 1): 72% over 14.
+	prof.DrillStats[trainer.QuizOuts.String()] = profile.SkillStat{
+		EMA: 0.72, Attempts: 14, Level: 1,
+	}
+	tr := NewTrainer(prof, DefaultPrefs())
+	tr.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	tr.list.cursor = int(trainer.QuizOuts)
+
+	view := squash(tr.View())
+	if !strings.Contains(view, "SKILL LADDER") {
+		t.Fatalf("menu missing the ladder; view: %q", view)
+	}
+	for l := 1; l <= trainer.MaxLevel; l++ {
+		if blurb := trainer.LevelBlurb(trainer.QuizOuts, l); !strings.Contains(view, blurb) {
+			t.Errorf("ladder missing level %d blurb %q", l, blurb)
+		}
+	}
+	// The completed level is checked off and the current one is marked.
+	if !strings.Contains(view, theme.G.Good+" 1") {
+		t.Errorf("level 1 should be checked off; view: %q", view)
+	}
+	if !strings.Contains(view, "> 2") {
+		t.Errorf("level 2 should carry the current marker; view: %q", view)
+	}
+	// The unlock line quotes the enforced thresholds and the live stat.
+	if !strings.Contains(view, "level 3 unlocks at 80% over 20") {
+		t.Errorf("ladder missing the unlock rule; view: %q", view)
+	}
+	if !strings.Contains(view, "now 72% over 14") {
+		t.Errorf("ladder missing the live progress; view: %q", view)
+	}
+
+	// On the Back row the ladder yields, but the layout must not reflow.
+	before := lipgloss.Height(tr.View())
+	tr.list.cursor = len(tr.list.rows) - 1
+	after := tr.View()
+	if strings.Contains(after, "SKILL LADDER") {
+		t.Error("the Back row has no ladder to show")
+	}
+	if got := lipgloss.Height(after); got != before {
+		t.Errorf("hiding the ladder changed the height %d -> %d", before, got)
+	}
+}
+
+// TestTrainerSummaryShowsUnlockProgress: a finished session that did not
+// level up still says how far the next unlock is — the ladder's promise
+// carried through to the moment the player is deciding whether to go again.
+func TestTrainerSummaryShowsUnlockProgress(t *testing.T) {
+	tr := testTrainerScreen(t, 80, 24)
+	tr.begin(trainer.QuizOuts)
+	for tr.state != trainerSummary {
+		if tr.state == trainerAsking {
+			// Deliberately wrong: no level-up, so the progress line shows.
+			tr.input = "999"
+			tr.handleAction(ActSelect)
+		} else {
+			tr.handleAction(ActContinue)
+		}
+	}
+	view := squash(tr.View())
+	if !strings.Contains(view, "unlocks at 80% over 20") {
+		t.Errorf("summary should state the next unlock and progress; view: %q", view)
 	}
 }

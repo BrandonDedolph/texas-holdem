@@ -259,13 +259,14 @@ func (g *GameSetup) View() string {
 	if g.help.open {
 		return renderHelp("Game Setup", g.keymap(), w, h)
 	}
-	th := theme.Current
-
-	title := th.Title.Render("Game Setup")
-	box := th.ContentBox.Padding(0, 2).Width(56).Render(g.list.Render(50))
-	hint := th.Help.Render("up/down move " + theme.G.Dot + " left/right change " +
-		theme.G.Dot + " enter select " + theme.G.Dot + " esc back")
-
-	content := title + "\n" + box + "\n" + hint
-	return frame(w, h, content)
+	// "enter select" is deliberately absent: with the shell's "? help" tail
+	// the full legend overflows the 60-column floor, and rowLR would drop
+	// the whole footer rather than clip mid-escape. Enter's role is on the
+	// help sheet; the two keys that differ from Settings are the ones shown.
+	return renderShell(w, h, shell{
+		Title:  "Game Setup",
+		Status: g.list.Detail(),
+		Footer: "up/down move " + theme.G.Dot + " left/right change " +
+			theme.G.Dot + " esc back",
+	}, "\n"+g.list.Render(formListWidth))
 }
