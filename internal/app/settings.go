@@ -29,14 +29,10 @@ func (m BackgroundMode) String() string {
 	return backgroundNames[m]
 }
 
-// Prefs are the session-lived presentation preferences: everything the
-// Settings screen controls that is not yet a profile field. CoachMode is
-// deliberately absent — it lives on the profile and persists today.
-//
-// TODO(wire-profile): Speed, Deck, ASCII and Background belong in
-// profile.Profile so they survive restarts; adding those fields is a
-// profile-package change outside this build wave. Until then they reset to
-// defaults each run, honestly.
+// Prefs are the presentation preferences the Settings screen controls. They
+// are held here as typed enums and mirrored to profile.Display (which stores
+// them as strings) so they survive restarts. CoachMode is deliberately absent:
+// it lives directly on the profile.
 type Prefs struct {
 	Speed      Speed
 	Deck       theme.DeckMode
@@ -61,10 +57,68 @@ func DefaultPrefs() *Prefs {
 	}
 }
 
-// Apply pushes the presentation prefs into the global theme state. Called
-// once at startup and after every Settings change; profile is accepted so
-// future persisted prefs can seed from it. TODO(wire-profile).
-func (p *Prefs) ApplyTo(_ *profile.Profile) {
+// PrefsFrom builds Prefs from a profile's stored display preferences, falling
+// back to the detected terminal state for anything unset. Unknown stored values
+// fall back to the default rather than erroring: a typo in a hand-edited
+// profile.json should never stop the game from starting.
+func PrefsFrom(p *profile.Profile) *Prefs {
+	prefs := DefaultPrefs()
+	if p == nil {
+		return prefs
+	}
+	d := p.Display
+	switch d.Speed {
+	case "normal":
+		prefs.Speed = SpeedNormal
+	case "fast":
+		prefs.Speed = SpeedFast
+	case "instant":
+		prefs.Speed = SpeedInstant
+	default:
+		prefs.Speed = SpeedLearn
+	}
+	if d.Deck == "two-color" {
+		prefs.Deck = theme.TwoColor
+	} else {
+		prefs.Deck = theme.FourColor
+	}
+	// ASCII is sticky only when the user turned it on; if the terminal cannot
+	// render Unicode we force it regardless of what was stored.
+	prefs.ASCII = d.ASCII || !theme.UnicodeSupported()
+	switch d.Background {
+	case "dark":
+		prefs.Background = BackgroundDark
+	case "light":
+		prefs.Background = BackgroundLight
+	default:
+		prefs.Background = BackgroundAuto
+	}
+	return prefs
+}
+
+// Display projects the prefs back into the profile's storable form.
+func (p *Prefs) Display() profile.Display {
+	speed := map[Speed]string{
+		SpeedLearn: "learn", SpeedNormal: "normal",
+		SpeedFast: "fast", SpeedInstant: "instant",
+	}[p.Speed]
+	deck := "four-color"
+	if p.Deck == theme.TwoColor {
+		deck = "two-color"
+	}
+	background := map[BackgroundMode]string{
+		BackgroundAuto: "auto", BackgroundDark: "dark", BackgroundLight: "light",
+	}[p.Background]
+	return profile.Display{Speed: speed, Deck: deck, ASCII: p.ASCII, Background: background}
+}
+
+// Apply pushes the presentation prefs into the global theme state and mirrors
+// them onto the profile. Called once at startup and after every Settings
+// change; the caller is responsible for saving.
+func (p *Prefs) ApplyTo(prof *profile.Profile) {
+	if prof != nil {
+		prof.Display = p.Display()
+	}
 	theme.SetDeckMode(p.Deck)
 	if p.ASCII {
 		theme.G = theme.ASCII()
@@ -217,6 +271,10 @@ func (s *Settings) applyRow(row int) {
 		s.prefs.Speed = Speed(r.Sel)
 	}
 	s.prefs.ApplyTo(s.prof)
+	// Presentation prefs live on the profile too, so persist them alongside
+	// the coaching change above. Best-effort for the same reason: a broken
+	// disk must not brick the settings screen.
+	_ = s.prof.Save()
 }
 
 // View implements tea.Model.

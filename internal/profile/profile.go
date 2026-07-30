@@ -62,6 +62,7 @@ type Profile struct {
 	SessionLog    []SessionSummary `json:"session_log"`
 	CoachMode     string           `json:"coach_mode"` // CoachFull | CoachMistakes | CoachOff
 	TableDefaults TableConfig      `json:"table_defaults"`
+	Display       Display          `json:"display"`
 
 	// store is the Store that loaded this profile, so Save writes back to
 	// the same place. Unexported and JSON-invisible; nil means "resolve the
@@ -88,6 +89,48 @@ type TableConfig struct {
 	Stack      engine.Chips `json:"stack"` // buy-in stack per seat
 }
 
+// Display holds terminal presentation preferences.
+//
+// The values are stored as strings rather than the app layer's enums so the
+// profile stays decoupled from internal/app (which imports profile, not the
+// other way round) and so a hand-edited profile.json reads sensibly. Unknown
+// values fall back to the default rather than erroring — a typo in a settings
+// file should not stop the game from starting.
+type Display struct {
+	Speed      string `json:"speed"`      // learn | normal | fast | instant
+	Deck       string `json:"deck"`       // four-color | two-color
+	ASCII      bool   `json:"ascii"`      // force the ASCII glyph set
+	Background string `json:"background"` // auto | dark | light
+}
+
+// Display defaults. Learn speed and the four-color deck are the learning-tool
+// defaults: unlimited reading time, and every suit its own ink because flush
+// blindness is the classic beginner leak.
+const (
+	SpeedLearn   = "learn"
+	DeckFourCol  = "four-color"
+	BackgroundAu = "auto"
+)
+
+// DefaultDisplay returns the first-run presentation preferences.
+func DefaultDisplay() Display {
+	return Display{Speed: SpeedLearn, Deck: DeckFourCol, Background: BackgroundAu}
+}
+
+// normalize fills blank fields with their defaults, so a profile written by an
+// older version (or edited by hand) is always usable.
+func (d *Display) normalize() {
+	if d.Speed == "" {
+		d.Speed = SpeedLearn
+	}
+	if d.Deck == "" {
+		d.Deck = DeckFourCol
+	}
+	if d.Background == "" {
+		d.Background = BackgroundAu
+	}
+}
+
 // DefaultTableConfig is the "classroom mix" (DESIGN.md §2.11): hero plus one
 // of each archetype, at the default stakes.
 func DefaultTableConfig() TableConfig {
@@ -112,6 +155,7 @@ func NewProfile() *Profile {
 		GradeTotals:   map[string]int{},
 		CoachMode:     CoachFull,
 		TableDefaults: DefaultTableConfig(),
+		Display:       DefaultDisplay(),
 	}
 }
 
@@ -130,6 +174,7 @@ func (p *Profile) ensureMaps() {
 	if p.GradeTotals == nil {
 		p.GradeTotals = map[string]int{}
 	}
+	p.Display.normalize()
 }
 
 // CompleteLesson records a lesson as done. Re-completing refreshes the

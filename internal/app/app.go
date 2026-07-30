@@ -79,9 +79,9 @@ func NewWithProfile(p *profile.Profile) *App {
 		current: ScreenMainMenu,
 		models:  make(map[Screen]tea.Model),
 		profile: p,
-		prefs:   DefaultPrefs(),
+		prefs:   PrefsFrom(p),
 	}
-	a.prefs.ApplyTo(p) // seed session prefs from persisted settings
+	a.prefs.ApplyTo(p) // push the restored prefs into the theme globals
 	a.models[ScreenMainMenu] = NewMainMenu()
 	return a
 }
