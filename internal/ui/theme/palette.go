@@ -48,3 +48,19 @@ var (
 	ColSuitDiamond = lipgloss.AdaptiveColor{Light: "#2178C4", Dark: "#60A5FA"}
 	ColSuitClub    = lipgloss.AdaptiveColor{Light: "#1E8449", Dark: "#2ECC71"}
 )
+
+// Card-face colors. These are deliberately FIXED rather than adaptive: a
+// playing card is a physical white object with colored ink on it, and it
+// looks like one in a dark terminal and a light one alike (design-tui.md
+// section 3.1). Suit inks on the face are the dark-on-white variants, because the
+// face is always white - the adaptive suit colors above are for cards
+// rendered as bare glyphs on the terminal background.
+var (
+	ColCardFace      = lipgloss.Color("#FFFFFF")
+	ColFaceSpade     = lipgloss.Color("#2C3E50")
+	ColFaceHeart     = lipgloss.Color("#C0392B")
+	ColFaceDiamond   = lipgloss.Color("#2178C4")
+	ColFaceClub      = lipgloss.Color("#1E8449")
+	ColCardFaceDimBg = lipgloss.Color("#CCCCCC")
+	ColCardFaceDim   = lipgloss.Color("#666666")
+)

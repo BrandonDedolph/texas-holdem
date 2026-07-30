@@ -54,3 +54,40 @@ func SuitStyle(s engine.Suit) lipgloss.Style {
 	}
 	return lipgloss.NewStyle().Foreground(ink).Bold(true)
 }
+
+// FaceStyle is the ink for a suit printed on a white card face. It is fixed
+// rather than adaptive: the face is always white, so the ink is always the
+// dark-on-white variant regardless of the terminal's background. SuitStyle
+// is its counterpart for cards drawn as bare glyphs on the terminal.
+//
+// The four-color/two-color toggle applies here too - the deck mode is about
+// which suits share an ink, not about the background they sit on.
+func FaceStyle(s engine.Suit) lipgloss.Style {
+	var ink lipgloss.Color
+	if deckMode == TwoColor {
+		switch s {
+		case engine.Hearts, engine.Diamonds:
+			ink = ColFaceHeart
+		default:
+			ink = ColFaceSpade
+		}
+	} else {
+		switch s {
+		case engine.Hearts:
+			ink = ColFaceHeart
+		case engine.Diamonds:
+			ink = ColFaceDiamond
+		case engine.Clubs:
+			ink = ColFaceClub
+		default:
+			ink = ColFaceSpade
+		}
+	}
+	return lipgloss.NewStyle().Background(ColCardFace).Foreground(ink)
+}
+
+// FaceBlank is the blank white interior of a card face, for padding cells
+// that carry no ink but must still be part of the card.
+func FaceBlank() lipgloss.Style {
+	return lipgloss.NewStyle().Background(ColCardFace)
+}

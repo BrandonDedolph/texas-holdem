@@ -93,25 +93,36 @@ const (
 	fullInterior = FullCardWidth - 2
 )
 
-// FullCard renders the 7x5 study card. highlight swaps the frame to the
-// CardWinner style — the emphasis form for "these five play".
+// FullCard renders the 7x5 study card: rank top-left, suit centred, rank
+// mirrored bottom-right, on a white face. highlight swaps the single frame
+// for the double-border emphasis form - "these five play", or the card a
+// drill is pointing at.
+//
+// The face is deliberately white with fixed dark ink rather than adaptive
+// terminal colours. A playing card is a physical white object, and drawing
+// it as one is most of what makes this read as a card instead of glyphs
+// floating in space (design-tui.md section 3.1).
 func FullCard(c engine.Card, highlight bool) string {
 	g := theme.G
 	border := theme.Current.CardBorder
+	tl, tr, bl, br, h, v := g.CardTL, g.CardTR, g.CardBL, g.CardBR, g.CardH, g.CardVL
+	vr := g.CardVR
 	if highlight {
 		border = theme.Current.CardWinner
+		tl, tr, bl, br, h, v = g.CardDblTL, g.CardDblTR, g.CardDblBL, g.CardDblBR, g.CardDblH, g.CardDblV
+		vr = g.CardDblV
 	}
 	rank := c.Rank().Symbol()
 	suit := theme.SuitGlyph(c.Suit())
-	ink := theme.SuitStyle(c.Suit())
+	ink := theme.FaceStyle(c.Suit())
 	pad := strings.Repeat(" ", fullInterior-lipgloss.Width(rank))
 	mid := strings.Repeat(" ", (fullInterior-1)/2)
 	rows := []string{
-		border.Render(g.CardTL + strings.Repeat(g.CardH, fullInterior) + g.CardTR),
-		border.Render(g.CardVL) + ink.Render(rank+pad) + border.Render(g.CardVR),
-		border.Render(g.CardVL) + ink.Render(mid+suit+mid) + border.Render(g.CardVR),
-		border.Render(g.CardVL) + ink.Render(pad+rank) + border.Render(g.CardVR),
-		border.Render(g.CardBL + strings.Repeat(g.CardH, fullInterior) + g.CardBR),
+		border.Render(tl + strings.Repeat(h, fullInterior) + tr),
+		border.Render(v) + ink.Render(rank+pad) + border.Render(vr),
+		border.Render(v) + ink.Render(mid+suit+mid) + border.Render(vr),
+		border.Render(v) + ink.Render(pad+rank) + border.Render(vr),
+		border.Render(bl + strings.Repeat(h, fullInterior) + br),
 	}
 	return strings.Join(rows, "\n")
 }

@@ -36,6 +36,10 @@ type Glyphs struct {
 	// distinct so the ASCII set can render bracket cards: [As], [##].
 	CardTL, CardTR, CardBL, CardBR, CardH, CardVL, CardVR string
 
+	// Double-border card frame, for emphasis: the winning five at showdown,
+	// the correct answer in a drill, the card a lesson is pointing at.
+	CardDblTL, CardDblTR, CardDblBL, CardDblBR, CardDblH, CardDblV string
+
 	// RuleH draws horizontal rules; Dot separates pot entries and eligible
 	// names; Ellipsis marks truncated text. One cell each.
 	RuleH, Dot, Ellipsis string
@@ -81,6 +85,13 @@ func Unicode() Glyphs {
 		Dealer:       " Ⓓ ",
 		ToAct:        "► ",
 		ChipsInFront: "●",
+
+		CardDblTL: "╔",
+		CardDblTR: "╗",
+		CardDblBL: "╚",
+		CardDblBR: "╝",
+		CardDblH:  "═",
+		CardDblV:  "║",
 
 		CardTL: "╭",
 		CardTR: "╮",
@@ -145,6 +156,13 @@ func ASCII() Glyphs {
 		Dealer:       "(D)",
 		ToAct:        "->",
 		ChipsInFront: "*",
+
+		CardDblTL: "#",
+		CardDblTR: "#",
+		CardDblBL: "#",
+		CardDblBR: "#",
+		CardDblH:  "=",
+		CardDblV:  "#",
 
 		CardTL: "+",
 		CardTR: "+",
