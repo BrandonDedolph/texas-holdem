@@ -127,12 +127,24 @@ func (c *Coach) GradeAction(adv Advice, taken engine.Action) GradedDecision {
 	cands := adv.Decision.Candidates
 	best := ai.Best(cands) // panics on empty — a candidate-less Decision is a strategy bug
 
+	matched := matchesPick(taken, adv.Decision.Action)
+
 	evLoss := best.ScoreBB - scoreFor(taken, cands)
 	if evLoss < 0 {
 		evLoss = 0
 	}
+	if matched {
+		// Following the coach costs nothing, by definition. The branch logic
+		// that picks the recommendation and the proxy that scores candidates
+		// can disagree by a hair, and where they do the recommendation wins:
+		// the app must never tell a player they leaked EV by doing exactly
+		// what it advised. This keeps the grade and the review's EV ledger
+		// telling the same story — a session of perfect obedience reads as
+		// zero leak, which is what a learner following instructions has
+		// every right to expect.
+		evLoss = 0
+	}
 
-	matched := matchesPick(taken, adv.Decision.Action)
 	grade := gradeFor(matched, evLoss)
 
 	g := GradedDecision{

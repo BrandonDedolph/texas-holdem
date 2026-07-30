@@ -255,3 +255,27 @@ func syntheticAdvice(pick engine.Action, cands ...ai.ScoredAction) Advice {
 		Digest:   ViewDigest{Street: engine.Flop},
 	}
 }
+
+// TestFollowingTheCoachNeverCostsEV pins the invariant that the grade band
+// and the EV ledger agree. GradeBest with a nonzero EVLossBB would have the
+// app congratulate a player and bill them for the same decision, and that
+// number feeds the review screen's "EV lost this hand" line.
+func TestFollowingTheCoachNeverCostsEV(t *testing.T) {
+	c := New(profile.NewProfile(), 42)
+	spots := []*engine.PlayerView{
+		heroView(t, flushDrawFacingBet(t, "As 7s 2h", "Kd Qc", 25, 3), 0),
+		heroView(t, bustedComboRiverSpot(t, 5), 0),
+		heroView(t, huHand(t, "Ah Js", "Kd Qc", "", 1000, 11), 0),
+		heroView(t, huHand(t, "7h 7c", "Kd Qc", "", 1000, 12), 0),
+	}
+	for i, v := range spots {
+		adv := c.Advise(v)
+		g := c.GradeAction(adv, adv.Decision.Action)
+		if g.Grade != GradeBest {
+			t.Errorf("spot %d: taking the coach's own pick graded %v, want GradeBest", i, g.Grade)
+		}
+		if g.EVLossBB != 0 {
+			t.Errorf("spot %d: taking the coach's own pick cost %.3fbb, want 0", i, g.EVLossBB)
+		}
+	}
+}
