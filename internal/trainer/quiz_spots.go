@@ -119,7 +119,13 @@ func buildPreflopSpot(rng *rand.Rand) (Item, bool) {
 		return Item{}, false
 	}
 
-	desc := "Folded to you"
+	// "Folded to you" is only true if somebody actually folded. UTG acts
+	// first, so nobody has, and telling a learner otherwise teaches broken
+	// position awareness to the exact player trying to learn position.
+	desc := "You are first to act"
+	if len(before) > 0 {
+		desc = "Folded to you"
+	}
 	if raiser >= 0 {
 		desc = h.Position(raiser).String() + " raises to " + openTo.String() + ", folded to you"
 	}

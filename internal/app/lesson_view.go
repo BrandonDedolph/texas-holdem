@@ -353,12 +353,34 @@ func (v *lessonView) render(w, h int) string {
 }
 
 // statusText picks the live status line: the script's while a hand runs,
-// the view's own otherwise.
+// the view's own otherwise. A scroll cue takes precedence over an idle
+// status, because content the reader cannot see outranks anything else the
+// line has to say.
 func (v *lessonView) statusText() string {
 	if v.script != nil && v.script.status != "" {
 		return v.script.status
 	}
+	if cue := v.scrollCue(); cue != "" && v.status == "" {
+		return cue
+	}
 	return v.status
+}
+
+// scrollCue describes off-screen content. A silently cropped section is the
+// worst failure this screen has: a 13-row range chart that renders 9 rows
+// looks complete, so a learner memorizes a chart missing its bottom four
+// rows and never knows. The cue says which direction is hiding something.
+func (v *lessonView) scrollCue() string {
+	switch {
+	case v.maxScroll <= 0:
+		return ""
+	case v.scroll == 0:
+		return "more below " + theme.G.Dot + " up/down to scroll"
+	case v.scroll >= v.maxScroll:
+		return "more above " + theme.G.Dot + " up/down to scroll"
+	default:
+		return "more above and below " + theme.G.Dot + " up/down to scroll"
+	}
 }
 
 // footerText names the keys of the current state, from the same vocabulary
@@ -380,7 +402,11 @@ func (v *lessonView) footerText() string {
 	case v.section().Drill != nil:
 		return "enter check" + dot + "left/right sections" + dot + "esc lessons" + dot + "? help"
 	default:
-		return "left/right sections" + dot + "esc lessons" + dot + "? help"
+		keys := "left/right sections"
+		if v.maxScroll > 0 {
+			keys = "up/down scroll" + dot + keys
+		}
+		return keys + dot + "esc lessons" + dot + "? help"
 	}
 }
 

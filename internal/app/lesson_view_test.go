@@ -618,3 +618,38 @@ func TestLessonRequestOpen(t *testing.T) {
 		t.Error("Open should move the list cursor to the opened lesson")
 	}
 }
+
+// TestCroppedSectionAlwaysAnnouncesItself is the guard for the worst failure
+// this screen can have. Lesson 5's UTG range chart renders 9 of its 13 rows
+// at 80x24 and looks complete; a learner would memorize a chart missing its
+// bottom four rows and never know. Content that does not fit must say so.
+func TestCroppedSectionAlwaysAnnouncesItself(t *testing.T) {
+	prof := profile.NewProfile()
+	for _, l := range tutorial.All() {
+		prof.CompleteLesson(l.ID)
+	}
+
+	for _, size := range []struct{ w, h int }{{80, 24}, {104, 30}, {60, 20}} {
+		for _, lesson := range tutorial.All() {
+			v := newLessonView(lesson, prof)
+			for i := range lesson.Sections {
+				v.idx, v.scroll = i, 0
+				out := v.render(size.w, size.h)
+				if v.maxScroll <= 0 {
+					continue
+				}
+				if !strings.Contains(out, "more below") && !strings.Contains(out, "more above") {
+					t.Errorf("%dx%d %s section %d crops %d lines with no cue:\n%s",
+						size.w, size.h, lesson.ID, i+1, v.maxScroll, out)
+				}
+				// Scrolled to the bottom, the cue must flip direction rather
+				// than keep promising content that is now above.
+				v.scroll = v.maxScroll
+				if out := v.render(size.w, size.h); !strings.Contains(out, "more above") {
+					t.Errorf("%dx%d %s section %d: no cue after scrolling to the end",
+						size.w, size.h, lesson.ID, i+1)
+				}
+			}
+		}
+	}
+}
