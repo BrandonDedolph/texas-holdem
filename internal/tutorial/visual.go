@@ -52,7 +52,11 @@ func (v *Visual) render(width int, compact bool) string {
 	case v.TableSeats != nil:
 		body = v.TableSeats.Render(width)
 	case v.HandLadder != nil:
-		body = v.HandLadder.Render(width)
+		if compact {
+			body = v.HandLadder.RenderCompact(width)
+		} else {
+			body = v.HandLadder.Render(width)
+		}
 	case v.PotOdds != nil:
 		body = v.PotOdds.Render(width)
 	default:
@@ -353,9 +357,17 @@ type VisualHandLadder struct {
 // is 30 rows: taller than any one screen, which is fine — the lesson view
 // scrolls and announces cropped content, and a scrolled ladder of real cards
 // teaches; an inline row of codes does not.
-func (l *VisualHandLadder) Render(width int) string {
+func (l *VisualHandLadder) Render(width int) string { return l.render(width, false) }
+
+// RenderCompact draws the ladder with mini cards. Full study cards are five
+// rows per tier, which at the 60x20 floor leaves too few rows for a tier's
+// name and cards to be on screen together at any scroll position - the
+// learner could scroll past a rung without ever seeing it whole.
+func (l *VisualHandLadder) RenderCompact(width int) string { return l.render(width, true) }
+
+func (l *VisualHandLadder) render(width int, compact bool) string {
 	rungs := LadderRungs()
-	out := make([]string, 0, 3*len(rungs))
+	out := make([]string, 0, components.FullCardHeight*len(rungs))
 	for i, r := range rungs {
 		nameStyle := theme.Current.Body
 		if l.Highlight == i+1 {
@@ -363,10 +375,16 @@ func (l *VisualHandLadder) Render(width int) string {
 		}
 		label := fmt.Sprintf("%2d. ", i+1)
 		margin := strings.Repeat(" ", lipgloss.Width(label))
-		rows := strings.Split(components.MiniCards(engine.MustCards(r.Cards)...), "\n")
+		cards := engine.MustCards(r.Cards)
+		block := components.FullCards(cards...)
+		if compact {
+			block = components.MiniCards(cards...)
+		}
+		rows := strings.Split(block, "\n")
+		mid := len(rows) / 2
 		for j, row := range rows {
 			line := margin + row
-			if j == 1 { // middle row: the tier's number and name beside its cards
+			if j == mid { // middle row: the tier's number and name beside its cards
 				line = theme.Current.Body.Render(label) + row + "  " + nameStyle.Render(r.Name)
 			}
 			out = append(out, clipTo(line, width))

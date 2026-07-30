@@ -477,7 +477,7 @@ func (v *lessonView) renderDrill(w int, compact bool) []string {
 		lines = append(lines, indentBlock(renderVisual(d.Visual, cw, compact))...)
 		lines = append(lines, "")
 	}
-	return append(lines, v.renderDrillInput(d, cw)...)
+	return append(lines, v.renderDrillInput(d, cw, compact)...)
 }
 
 // renderVisual draws a visual in the form the breakpoint can afford: full
@@ -490,7 +490,7 @@ func renderVisual(vis *tutorial.Visual, width int, compact bool) string {
 }
 
 // renderDrillInput draws the answer widget for the drill's answer type.
-func (v *lessonView) renderDrillInput(d *tutorial.Drill, cw int) []string {
+func (v *lessonView) renderDrillInput(d *tutorial.Drill, cw int, compact bool) []string {
 	th := theme.Current
 	caret := th.Help.Render("_")
 
@@ -510,13 +510,19 @@ func (v *lessonView) renderDrillInput(d *tutorial.Drill, cw int) []string {
 		lines := make([]string, 0, 3*len(ans.Items)+2)
 		if hands, ok := orderItemsAsCards(ans.Items); ok {
 			// The learner is being asked to RANK these hands, so each option
-			// is drawn as cards — mini cards, so all the options and the input
-			// line share the screen with no scrolling mid-answer.
+			// is drawn as cards. Study cards normally; the compact floor
+			// cannot pay five rows an option and still show the input line,
+			// and a drill must not scroll while an answer is being typed.
 			for i, hand := range hands {
 				label := "  " + strconv.Itoa(i+1) + ". "
 				margin := strings.Repeat(" ", lipgloss.Width(label))
-				for j, row := range strings.Split(components.MiniCards(hand...), "\n") {
-					if j == 1 { // middle row carries the option number
+				block := components.FullCards(hand...)
+				if compact {
+					block = components.MiniCards(hand...)
+				}
+				rows := strings.Split(block, "\n")
+				for j, row := range rows {
+					if j == len(rows)/2 { // middle row carries the option number
 						lines = append(lines, " "+th.Body.Render(label)+row)
 					} else {
 						lines = append(lines, " "+margin+row)

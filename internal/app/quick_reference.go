@@ -259,14 +259,19 @@ var rankingNotes = [...]string{
 func (q *QuickReference) renderRankings() string {
 	th := theme.Current
 	var out []string
+	// The tier's name heads its example hand rather than sitting beside it.
+	// Five study cards plus a label and the longest tier name is about 61
+	// cells, and this panel is a fixed 56 that must also survive the 60-col
+	// floor - so the name goes above, which reads as a heading anyway.
 	for i, r := range tutorial.LadderRungs() {
 		num := padRow(itoa2(i+1)+".", 4)
 		margin := strings.Repeat(" ", len(num))
-		rows := strings.Split(components.MiniCards(engine.MustCards(r.Cards)...), "\n")
-		out = append(out,
-			margin+rows[0],
-			th.Body.Render(num)+rows[1]+"  "+th.Header.Render(r.Name),
-			margin+rows[2]+"  "+th.Help.Render(rankingNotes[i]))
+		out = append(out, th.Body.Render(num)+th.Header.Render(r.Name)+
+			"  "+th.Help.Render(rankingNotes[i]))
+		for _, row := range strings.Split(components.FullCards(engine.MustCards(r.Cards)...), "\n") {
+			out = append(out, margin+row)
+		}
+		out = append(out, "")
 	}
 	return strings.Join(out, "\n")
 }

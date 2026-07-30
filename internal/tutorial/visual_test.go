@@ -1,6 +1,7 @@
 package tutorial
 
 import (
+	"github.com/BrandonDedolph/texas-holdem/internal/ui/components"
 	"strconv"
 	"strings"
 	"testing"
@@ -132,11 +133,12 @@ func TestHandLadderDrawsCards(t *testing.T) {
 		t.Errorf("ladder draws %d card frames, want %d (5 per rung)", got, want)
 	}
 	lines := strings.Split(plain, "\n")
-	if got, want := len(lines), 3*len(rungs); got != want {
-		t.Errorf("ladder is %d rows, want %d (3 per rung)", got, want)
+	h := components.FullCardHeight
+	if got, want := len(lines), h*len(rungs); got != want {
+		t.Errorf("ladder is %d rows, want %d (%d per rung)", got, want, h)
 	}
 	for i, r := range rungs {
-		mid := lines[3*i+1]
+		mid := lines[h*i+h/2]
 		if !strings.Contains(mid, r.Name) {
 			t.Errorf("rung %d middle row %q missing tier name %q", i+1, mid, r.Name)
 		}
@@ -145,12 +147,14 @@ func TestHandLadderDrawsCards(t *testing.T) {
 			t.Errorf("rung %d middle row %q missing its number %q", i+1, mid, wantNum)
 		}
 		// The example hand appears as drawn card faces, not inline codes: the
-		// suit rides its own glyph inside a frame on the same three rows.
+		// suit rides its own glyph inside the frame.
+		// The study card splits rank and suit onto separate rows, so the
+		// band must carry both marks rather than an inline "A<spade>" pair.
+		band := strings.Join(lines[h*i:h*(i+1)], "\n")
 		for _, c := range engine.MustCards(r.Cards) {
-			face := c.Rank().Symbol() + theme.SuitGlyph(c.Suit())
-			band := strings.Join(lines[3*i:3*i+3], "\n")
-			if !strings.Contains(band, face) {
-				t.Errorf("rung %d band missing drawn face %q", i+1, face)
+			if !strings.Contains(band, c.Rank().Symbol()) ||
+				!strings.Contains(band, theme.SuitGlyph(c.Suit())) {
+				t.Errorf("rung %d band missing drawn card %q", i+1, c.Code())
 			}
 		}
 	}

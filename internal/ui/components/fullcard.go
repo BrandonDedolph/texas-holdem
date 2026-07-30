@@ -98,14 +98,41 @@ func FullHand(hole [2]engine.Card, highlight engine.CardSet) string {
 }
 
 // MiniCards renders a row of face-up mini cards with one-column gaps - the
-// drawn form for a named hand ("these five specific cards") in rows too
-// tight for the 5-row study card: the ten-tier hand ladder, order-the-hands
-// drill items, the quick reference's rankings tab. Always MiniCardHeight
-// rows tall and len(cards)*(MiniCardWidth+1)-1 cells wide.
+// drawn form for a named hand in rows too tight for the 5-row study card.
+// Only the 60x20 compact breakpoint is that tight; everywhere else uses
+// FullCards, which is what a named hand should look like.
 func MiniCards(cards ...engine.Card) string {
 	slots := make([]string, len(cards))
 	for i, c := range cards {
 		slots[i] = MiniCard(c)
+	}
+	return joinSlots(slots, " ")
+}
+
+// FullCards renders a row of face-up study cards with one-column gaps: the
+// drawn form for a named hand ("these five specific cards") wherever the
+// rows exist to pay for it - the ten-tier hand ladder, order-the-hands
+// drill items, the quick reference's rankings tab.
+//
+// Five rows per hand is expensive, and the ladder's ten tiers scroll
+// because of it. That is the right trade: these screens exist to be looked
+// at, and a hand a learner is asked to rank should look like cards on a
+// table, not like a compressed index. The mini form is the fallback for
+// the compact breakpoint only.
+func FullCards(cards ...engine.Card) string {
+	slots := make([]string, len(cards))
+	for i, c := range cards {
+		slots[i] = FullCard(c, false)
+	}
+	return joinSlots(slots, " ")
+}
+
+// FullCardsEmphasis is FullCards with the cards in highlight drawn in the
+// double-border frame.
+func FullCardsEmphasis(cards []engine.Card, highlight engine.CardSet) string {
+	slots := make([]string, len(cards))
+	for i, c := range cards {
+		slots[i] = FullCard(c, highlight.Has(c))
 	}
 	return joinSlots(slots, " ")
 }
