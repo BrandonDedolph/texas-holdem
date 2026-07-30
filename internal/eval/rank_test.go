@@ -61,7 +61,7 @@ func TestDescriptionGoldens(t *testing.T) {
 		{
 			"Kd Jd 9d 6d 4d",
 			"Flush, King high",
-			"Flush, King high with Jack, Nine, Six, and Four kickers",
+			"Flush, King high (K-J-9-6-4)",
 		},
 		{
 			"Kh Qs Jd Tc 9h",

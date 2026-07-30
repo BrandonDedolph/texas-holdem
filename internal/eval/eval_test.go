@@ -156,7 +156,7 @@ func TestEval7Adversarial(t *testing.T) {
 		{"Ah Kh Qh Jh Th 9h 8h", "Royal Flush"},
 		// Trips plus a five-card flush: the flush plays, and the shortcut
 		// must not be fooled into a boat that is not there.
-		{"Kh Ks Kd Ah Qh Jh 9h", "Flush, Ace high with King, Queen, Jack, and Nine kickers"},
+		{"Kh Ks Kd Ah Qh Jh 9h", "Flush, Ace high (A-K-Q-J-9)"},
 		// A real boat with only four suited cards: the flush path must not fire.
 		{"As Ad Ac Kh Kd Qh Jh", "Full House, Aces full of Kings"},
 		{"Kc Kd Kh Ks Ac 2d 3h", "Four of a Kind, Kings with an Ace kicker"},

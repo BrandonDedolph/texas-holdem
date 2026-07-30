@@ -120,7 +120,9 @@ func (r HandRank) Describe() string {
 	case Straight:
 		return "Straight, " + straightSpan(r.k(0))
 	case Flush:
-		return r.String() + kickerPhrase(r.k(1), r.k(2), r.k(3), r.k(4))
+		// A flush has no kickers — all five cards play. Listing the ranks
+		// teaches that, where "with ... kickers" would teach the opposite.
+		return r.String() + " (" + rankRun(r.k(0), r.k(1), r.k(2), r.k(3), r.k(4)) + ")"
 	case FullHouse:
 		return r.String()
 	case FourOfAKind:
@@ -142,6 +144,19 @@ func straightSpan(top engine.Rank) string {
 		low = engine.Ace
 	}
 	return low.String() + " to " + top.String()
+}
+
+// rankRun renders ranks as a hyphenated run of letters: "K-Q-9-7-3". Used for
+// flushes, where every card plays and none of them is a kicker.
+func rankRun(ks ...engine.Rank) string {
+	var b strings.Builder
+	for i, k := range ks {
+		if i > 0 {
+			b.WriteByte('-')
+		}
+		b.WriteByte(k.Letter())
+	}
+	return b.String()
 }
 
 // kickerPhrase renders the trailing kicker clause of Describe:
