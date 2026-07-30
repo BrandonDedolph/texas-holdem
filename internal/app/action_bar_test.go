@@ -81,7 +81,7 @@ func barFixtures() []barFixture {
 // armedBar builds a choosing-state bar over a fixture.
 func armedBar(f barFixture) *ActionBar {
 	b := NewActionBar()
-	b.Arm(f.legal, 185, f.legal.CallAmount(), 0, 10, "")
+	b.Arm(f.legal, engine.Flop, 185, f.legal.CallAmount(), 0, 10, "")
 	return b
 }
 
@@ -130,7 +130,7 @@ func TestActionBarPresetsMatchArithmetic(t *testing.T) {
 		{Type: engine.ActionCheck},
 		{Type: engine.ActionBet, Min: 10, Max: 900},
 	}
-	b.Arm(legal, 185, 0, 0, 10, "")
+	b.Arm(legal, engine.Flop, 185, 0, 0, 10, "")
 	if _, skipped := b.OpenSizing(engine.ActionBet); skipped {
 		t.Fatal("a real range must open sizing, not skip it")
 	}
@@ -153,7 +153,7 @@ func TestActionBarPresetsRespectEngineClamps(t *testing.T) {
 		{Type: engine.ActionCheck},
 		{Type: engine.ActionBet, Min: 50, Max: 100}, // shallow stack
 	}
-	b.Arm(legal, 185, 0, 0, 10, "")
+	b.Arm(legal, engine.Flop, 185, 0, 0, 10, "")
 	b.OpenSizing(engine.ActionBet)
 	want := [5]engine.Chips{62, 93, 100, 100, 100}
 	if got := b.presetAmounts(); got != want {
@@ -171,7 +171,7 @@ func TestActionBarRaisePresetsUsePotAfterCall(t *testing.T) {
 		{Type: engine.ActionCall, Min: 60, Max: 60},
 		{Type: engine.ActionRaise, Min: 200, Max: 1000},
 	}
-	b.Arm(legal, 300, 60, 40, 10, "")
+	b.Arm(legal, engine.Flop, 300, 60, 40, 10, "")
 	b.OpenSizing(engine.ActionRaise)
 	want := [5]engine.Chips{220, 280, 340, 460, 1000}
 	if got := b.presetAmounts(); got != want {
@@ -186,7 +186,7 @@ func TestActionBarTypedAmountShowsClamp(t *testing.T) {
 		{Type: engine.ActionCheck},
 		{Type: engine.ActionBet, Min: 10, Max: 900},
 	}
-	b.Arm(legal, 185, 0, 0, 10, "")
+	b.Arm(legal, engine.Flop, 185, 0, 0, 10, "")
 	b.OpenSizing(engine.ActionBet)
 
 	// Under min: typed 7 (starts with a leading 0) shows the min clamp.
@@ -219,7 +219,7 @@ func TestActionBarDigitsVersusPresets(t *testing.T) {
 		{Type: engine.ActionCheck},
 		{Type: engine.ActionBet, Min: 10, Max: 900},
 	}
-	b.Arm(legal, 185, 0, 0, 10, "")
+	b.Arm(legal, engine.Flop, 185, 0, 0, 10, "")
 	b.OpenSizing(engine.ActionBet)
 
 	// With nothing typed, 2 is the half-pot preset.
@@ -248,7 +248,7 @@ func TestActionBarNudgeIsClampedAndUnitBB(t *testing.T) {
 		{Type: engine.ActionCheck},
 		{Type: engine.ActionBet, Min: 10, Max: 40},
 	}
-	b.Arm(legal, 60, 0, 0, 10, "")
+	b.Arm(legal, engine.Flop, 60, 0, 0, 10, "")
 	b.OpenSizing(engine.ActionBet)
 	b.amount = 20
 	b.Nudge(+1)
@@ -275,7 +275,7 @@ func TestActionBarSkipsSizingWhenPinnedToAllIn(t *testing.T) {
 		{Type: engine.ActionCall, Min: 100, Max: 100},
 		{Type: engine.ActionRaise, Min: 285, Max: 285},
 	}
-	b.Arm(legal, 400, 100, 0, 10, "")
+	b.Arm(legal, engine.Flop, 400, 100, 0, 10, "")
 	amt, skipped := b.OpenSizing(engine.ActionRaise)
 	if !skipped || amt != 285 {
 		t.Errorf("pinned raise: got (%v, %v), want (285, skipped)", amt, skipped)
@@ -294,14 +294,14 @@ func TestActionBarAlwaysExactlyTwoRows(t *testing.T) {
 				{Type: engine.ActionFold},
 				{Type: engine.ActionCall, Min: 20, Max: 20},
 				{Type: engine.ActionRaise, Min: 40, Max: 990},
-			}, 45, 20, 10, 10, "to call 20")
+			}, engine.Flop, 45, 20, 10, 10, "to call 20")
 		},
 		"sizing": func(b *ActionBar) {
 			b.Arm(engine.ActionOptions{
 				{Type: engine.ActionFold},
 				{Type: engine.ActionCheck},
 				{Type: engine.ActionBet, Min: 10, Max: 900},
-			}, 185, 0, 0, 10, "")
+			}, engine.Flop, 185, 0, 0, 10, "")
 			b.OpenSizing(engine.ActionBet)
 		},
 	}

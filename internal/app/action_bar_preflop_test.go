@@ -59,7 +59,7 @@ func buildPreflopSpot(t *testing.T, name string, hero engine.Seat, sb, bbChips, 
 // number straight off the engine.
 func armFromHand(spot preflopSpot) *ActionBar {
 	b := NewActionBar()
-	b.Arm(spot.hand.LegalActions(), spot.hand.PotTotal(),
+	b.Arm(spot.hand.LegalActions(), spot.hand.Street(), spot.hand.PotTotal(),
 		spot.hand.ToCall(spot.hero), spot.hand.Committed(spot.hero),
 		spot.bb, "")
 	return b
@@ -172,7 +172,7 @@ func TestPostflopPresetLabelsStayPotFractions(t *testing.T) {
 		{Type: engine.ActionFold},
 		{Type: engine.ActionCheck},
 		{Type: engine.ActionBet, Min: 10, Max: 900},
-	}, 185, 0, 0, 10, "")
+	}, engine.Flop, 185, 0, 0, 10, "")
 	b.OpenSizing(engine.ActionBet)
 	view := stripANSI(b.View(80))
 	for _, s := range []string{"1 1/3 62", "2 1/2 93", "3 2/3 123", "4 pot 185"} {
@@ -184,13 +184,13 @@ func TestPostflopPresetLabelsStayPotFractions(t *testing.T) {
 		t.Errorf("postflop bet presets must not speak big blinds:\n%s", view)
 	}
 
-	// Raising over a real bet (current bet level > 1bb): also fractions.
+	// Raising over a real bet POSTFLOP: fractions, the postflop vocabulary.
 	b = NewActionBar()
 	b.Arm(engine.ActionOptions{
 		{Type: engine.ActionFold},
 		{Type: engine.ActionCall, Min: 60, Max: 60},
 		{Type: engine.ActionRaise, Min: 200, Max: 1000},
-	}, 300, 60, 40, 10, "")
+	}, engine.Flop, 300, 60, 40, 10, "")
 	b.OpenSizing(engine.ActionRaise)
 	if b.openingPreflop() {
 		t.Fatal("a raise over a 100-chip bet is not a preflop open")
@@ -211,12 +211,64 @@ func TestPreflopShortStackStillSkipsSizing(t *testing.T) {
 		{Type: engine.ActionFold},
 		{Type: engine.ActionCall, Min: 10, Max: 10},
 		{Type: engine.ActionRaise, Min: 15, Max: 15},
-	}, 15, 10, 0, 10, "")
+	}, engine.Preflop, 15, 10, 0, 10, "")
 	amt, skipped := b.OpenSizing(engine.ActionRaise)
 	if !skipped || amt != 15 {
 		t.Fatalf("pinned preflop raise: got (%v, %v), want (15, skipped)", amt, skipped)
 	}
 	if b.State() != ActionBarChoosing {
 		t.Fatalf("skipped sizing must not change state, got %v", b.State())
+	}
+}
+
+// TestPreflop3BetLadderReachesTheCoach: facing an open, the coach's 3-bet is
+// a multiple of that open, not of the blind. Pot fractions cannot express
+// that, so before the street reached the bar this spot offered sizes the
+// coach would never name.
+func TestPreflop3BetLadderReachesTheCoach(t *testing.T) {
+	b := NewActionBar()
+	// Hero on the button facing a 3bb open: current bet level 30, blind 10.
+	b.Arm(engine.ActionOptions{
+		{Type: engine.ActionFold},
+		{Type: engine.ActionCall, Min: 30, Max: 30},
+		{Type: engine.ActionRaise, Min: 50, Max: 1000},
+	}, engine.Preflop, 45, 30, 0, 10, "")
+	b.OpenSizing(engine.ActionRaise)
+
+	if b.openingPreflop() {
+		t.Fatal("facing an open is not an opening spot")
+	}
+	got := b.presetAmounts()
+	// 2.5x / 3x / 3.5x / 4x of a 30 open.
+	want := []engine.Chips{75, 90, 105, 120}
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("preset %d = %v, want %v (a multiple of the 30 open); got %v",
+				i+1, got[i], w, got)
+		}
+	}
+
+	// The standard 3-bet (3x the open) must be one keypress away.
+	view := stripANSI(b.View(80))
+	if !strings.Contains(view, "90") {
+		t.Errorf("the standard 3x 3-bet is not on the ladder:\n%s", view)
+	}
+}
+
+// TestPostflopRaiseKeepsFractions: the street is what distinguishes the two
+// vocabularies, and postflop must be unaffected by the preflop ladder.
+func TestPostflopRaiseKeepsFractions(t *testing.T) {
+	b := NewActionBar()
+	b.Arm(engine.ActionOptions{
+		{Type: engine.ActionFold},
+		{Type: engine.ActionCall, Min: 30, Max: 30},
+		{Type: engine.ActionRaise, Min: 50, Max: 1000},
+	}, engine.Flop, 45, 30, 0, 10, "")
+	b.OpenSizing(engine.ActionRaise)
+	if b.preflopRaise() {
+		t.Fatal("a flop raise must not use the preflop ladder")
+	}
+	if got := b.presetAmounts(); got[1] == 90 {
+		t.Errorf("flop presets look like the 3-bet ladder: %v", got)
 	}
 }

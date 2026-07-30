@@ -39,6 +39,7 @@ type ActionBar struct {
 	typed  string // digits typed so far; "" means amount holds the value
 
 	// Hero-spot numbers for preset arithmetic and the choosing readout.
+	street    engine.Street
 	pot       engine.Chips // pot total before the hero acts
 	toCall    engine.Chips // chips the hero owes to call (0 when check is free)
 	committed engine.Chips // hero's chips already in this street
@@ -61,9 +62,10 @@ func (b *ActionBar) Wait() {
 // Arm puts the bar in the choosing state for the hero's turn. legal comes
 // verbatim from Hand.LegalActions; pot/toCall/committed feed the preset and
 // odds arithmetic; info is the pre-formatted right-hand readout.
-func (b *ActionBar) Arm(legal engine.ActionOptions, pot, toCall, committed, bigBlind engine.Chips, info string) {
+func (b *ActionBar) Arm(legal engine.ActionOptions, street engine.Street, pot, toCall, committed, bigBlind engine.Chips, info string) {
 	b.state = ActionBarChoosing
 	b.legal = legal
+	b.street = street
 	b.pot, b.toCall, b.committed, b.bigBlind = pot, toCall, committed, bigBlind
 	b.info = info
 	b.mode = 0
@@ -241,22 +243,26 @@ func (b *ActionBar) ConfirmAmount() engine.Chips { return b.clamp(b.value()) }
 // SizingType returns which action is being sized (ActionBet or ActionRaise).
 func (b *ActionBar) SizingType() engine.ActionType { return b.mode }
 
-// openingPreflop reports whether the raise being sized is a preflop open:
-// the bet the hero is raising over (committed + toCall, the current bet
-// level) is exactly one big blind — the blind itself, whether first-in,
-// behind limpers, or checking the BB's option. Preflop sizing is spoken in
-// big blinds ("open to 2.5x"), not pot fractions, so this spot gets the
-// bb ladder (docs/ui-review.md F5).
-//
-// The bar is not told the street, so one postflop shape shares this
-// signature: raising over a minimum bet of exactly one bb. The bb labels
-// remain truthful there ("3bb 30" IS the raise-to amount), so the
-// coincidence misleads nobody. Distinguishing a preflop open from a raise
-// over a larger bet (a 3-bet spot vs a postflop raise) is NOT derivable
-// from Arm's inputs — that refinement needs the street passed in.
+// preflopRaise reports whether the raise being sized is a preflop raise of
+// any kind — an open, an iso over limpers, or a 3-bet over someone else's
+// open. Preflop sizing is spoken in big blinds ("open to 2.5x", "3-bet to
+// 9bb"), postflop in pot fractions, and the controls should teach that
+// distinction rather than blur it (docs/ui-review.md F5).
+func (b *ActionBar) preflopRaise() bool {
+	return b.mode == engine.ActionRaise && b.bigBlind > 0 && b.street == engine.Preflop
+}
+
+// facingOpen reports whether there is a raise to 3-bet over, as opposed to
+// the hero being first in with only the blind to beat. The current bet
+// level is committed + toCall; anything above one big blind means somebody
+// has already raised.
+func (b *ActionBar) facingOpen() bool {
+	return b.committed+b.toCall > b.bigBlind
+}
+
+// openingPreflop is a preflop raise with nobody having opened yet.
 func (b *ActionBar) openingPreflop() bool {
-	return b.mode == engine.ActionRaise && b.bigBlind > 0 &&
-		b.committed+b.toCall == b.bigBlind
+	return b.preflopRaise() && !b.facingOpen()
 }
 
 // presetAmounts computes the five preset values, engine-clamped.
@@ -280,6 +286,20 @@ func (b *ActionBar) presetAmounts() [5]engine.Chips {
 			b.clamp(5 * bb / 2),
 			b.clamp(3 * bb),
 			b.clamp(4 * bb),
+			b.opt.Max,
+		}
+	}
+	if b.preflopRaise() {
+		// Facing an open, the standard 3-bet is a multiple of the open, not
+		// of the blind: roughly 3x in position and 4x out of it. Anchoring
+		// the ladder to the open is what makes "3-bet to 3x" a size the
+		// player can reach, and teaches the multiple rather than a number.
+		open := b.committed + b.toCall
+		return [5]engine.Chips{
+			b.clamp(5 * open / 2),
+			b.clamp(3 * open),
+			b.clamp(7 * open / 2),
+			b.clamp(4 * open),
 			b.opt.Max,
 		}
 	}

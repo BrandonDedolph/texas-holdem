@@ -634,7 +634,7 @@ func (m *TableScreen) armBar() {
 			info += dot + m.seatName(v) + " " + m.hand.Stack(v).String() + " behind"
 		}
 	}
-	m.bar.Arm(legal, pot, toCall, committed, m.cfg.BigBlind, info)
+	m.bar.Arm(legal, m.hand.Street(), pot, toCall, committed, m.cfg.BigBlind, info)
 	m.status = "Your turn " + theme.G.Dot + " " + m.choicesSummary()
 
 	// Advice is captured the moment the turn begins and frozen. The

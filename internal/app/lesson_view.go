@@ -699,8 +699,8 @@ func (r *scriptRun) armHero() {
 	if toCall > 0 {
 		info = "to call " + toCall.String() + dot + "pot odds " + equity.PotOddsText(toCall, pot)
 	}
-	r.bar.Arm(r.hand.LegalActions(), pot, toCall, r.hand.Committed(hero),
-		r.script.BigBlind, info)
+	r.bar.Arm(r.hand.LegalActions(), r.hand.Street(), pot, toCall,
+		r.hand.Committed(hero), r.script.BigBlind, info)
 
 	r.status = "your turn"
 	if r.stop != nil && r.stop.Expect != nil {
