@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/charmbracelet/lipgloss"
 	"strings"
 	"testing"
 
@@ -130,15 +131,30 @@ func TestEndSessionDropsTableAndReview(t *testing.T) {
 }
 
 func TestWindowSizeForwardedBeforeInit(t *testing.T) {
-	a := newTestApp(t)
-	drive(t, a, tea.WindowSizeMsg{Width: 100, Height: 30})
+	// Every screen now has a real model, so this asserts the behaviour rather
+	// than one screen's private fields: a freshly constructed screen must
+	// render at the app's size on its very first View, which only holds if
+	// the size reached it before Init.
+	for _, screen := range []Screen{
+		ScreenGameSetup, ScreenQuickReference, ScreenSettings,
+		ScreenLessons, ScreenTrainer,
+	} {
+		t.Run(screen.String(), func(t *testing.T) {
+			a := newTestApp(t)
+			drive(t, a, tea.WindowSizeMsg{Width: 100, Height: 30})
+			drive(t, a, NavigateMsg{Screen: screen})
 
-	// Any freshly constructed screen will do; ScreenTrainer is the one still
-	// on a placeholder, whose size fields are directly readable.
-	drive(t, a, NavigateMsg{Screen: ScreenTrainer})
-	cs := a.models[ScreenTrainer].(*ComingSoon)
-	if cs.width != 100 || cs.height != 30 {
-		t.Errorf("new screen sized %dx%d before Init, want 100x30", cs.width, cs.height)
+			view := a.View()
+			if strings.TrimSpace(view) == "" {
+				t.Fatal("first View after navigation was empty")
+			}
+			for i, line := range strings.Split(view, "\n") {
+				if w := lipgloss.Width(line); w > 100 {
+					t.Fatalf("line %d is %d cells wide, want <= 100 — the screen "+
+						"rendered at a fallback size, so it was not sized before Init", i, w)
+				}
+			}
+		})
 	}
 }
 

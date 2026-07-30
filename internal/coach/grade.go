@@ -2,6 +2,7 @@ package coach
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/BrandonDedolph/texas-holdem/internal/ai"
 	"github.com/BrandonDedolph/texas-holdem/internal/engine"
@@ -33,6 +34,17 @@ func (g Grade) String() string {
 		return "?"
 	}
 	return gradeNames[g]
+}
+
+// Label is the capitalized display form ("Inaccuracy"). String stays
+// lowercase because it doubles as the profile.GradeTotals key; this is the
+// form shown to a player.
+func (g Grade) Label() string {
+	name := g.String()
+	if name == "" || name == "?" {
+		return name
+	}
+	return strings.ToUpper(name[:1]) + name[1:]
 }
 
 // GoodOrBetter reports whether the decision counts toward the accuracy
@@ -88,6 +100,12 @@ type GradedDecision struct {
 
 	Street engine.Street
 	Taken  engine.Action
+
+	// Recommended is the action the coach advised at decision time. It is
+	// part of the frozen record, not a derived value: the review screen
+	// shows "Coach: call" beside what the hero actually did, and recomputing
+	// it later would risk showing advice that was never given.
+	Recommended engine.Action
 
 	// Best is the highest-scoring candidate — the counterfactual EV loss
 	// is measured against. Note it may differ from the coach's chosen
@@ -148,13 +166,14 @@ func (c *Coach) GradeAction(adv Advice, taken engine.Action) GradedDecision {
 	grade := gradeFor(matched, evLoss)
 
 	g := GradedDecision{
-		Street:     adv.Digest.Street,
-		Taken:      taken,
-		Best:       best,
-		EVLossBB:   evLoss,
-		Grade:      grade,
-		Body:       gradeBody(adv.Decision.Action, taken, grade, evLoss),
-		ViewDigest: adv.Digest,
+		Street:      adv.Digest.Street,
+		Taken:       taken,
+		Recommended: adv.Decision.Action,
+		Best:        best,
+		EVLossBB:    evLoss,
+		Grade:       grade,
+		Body:        gradeBody(adv.Decision.Action, taken, grade, evLoss),
+		ViewDigest:  adv.Digest,
 	}
 	if c != nil && c.prof != nil {
 		c.prof.RecordGrade(grade.String())

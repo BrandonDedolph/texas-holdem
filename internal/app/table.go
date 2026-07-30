@@ -274,6 +274,11 @@ func (m *TableScreen) startHand() tea.Cmd {
 	m.hand = h
 	m.handNo++
 	m.eventsSeen = 0
+	// Grades belong to the hand they were taken in. Carrying them over would
+	// let the review key a previous hand's verdicts onto this hand's events,
+	// attributing a judgement to an action the hero never took here.
+	m.grades = nil
+	m.advice, m.lastGrade = nil, nil
 	m.boardShown, m.boardQueued = 0, 0
 	m.lastAction = [engine.MaxSeats]string{}
 	m.heroLine = ""

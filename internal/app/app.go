@@ -202,8 +202,7 @@ func (a *App) newScreen(screen Screen, data interface{}) tea.Model {
 		}
 		return l
 	case ScreenTrainer:
-		// TODO(wire-trainer): later wave.
-		return newComingSoon(screen)
+		return NewTrainer(a.profile, a.prefs)
 	default:
 		return NewMainMenu()
 	}

@@ -621,9 +621,11 @@ func sortStrings(s []string) {
 // presses v. Only a completed hand is reviewable; mid-hand there is nothing
 // frozen to show.
 //
-// TODO(wire-coach): Grades stays empty until internal/coach lands; the coach
-// will hand the table its frozen GradedDecisions as the hero acts, and the
-// table will map them into review.FrozenGrade here, keyed by event index.
+// Grades come from the coach's frozen GradedDecisions, recorded as the hero
+// acted. They are mapped onto event indices here and never recomputed — the
+// review layer can see every hole card, and re-grading with that knowledge
+// would destroy the whole point (DESIGN.md §1).
+//
 // TODO(ulid): record IDs become ULIDs when persistence wiring lands.
 func (m *TableScreen) lastHandArchive() (engine.HandRecord, review.HandAnnotations, bool) {
 	if m.hand == nil || m.hand.Phase() != engine.PhaseComplete {
@@ -653,6 +655,51 @@ func (m *TableScreen) lastHandArchive() (engine.HandRecord, review.HandAnnotatio
 
 	id := "hand-" + strconv.Itoa(m.handNo)
 	rec := review.NewRecord(m.hand, id, time.Now().UTC(), seats)
-	ann := review.HandAnnotations{HandID: id, Grades: map[int]review.FrozenGrade{}}
+	ann := review.HandAnnotations{HandID: id, Grades: m.frozenGrades(rec)}
 	return rec, ann, true
+}
+
+// frozenGrades keys this hand's grades by event index. The hero's EvAction
+// events appear in the log in the same order the grades were taken, so the
+// two zip together; any mismatch means a grade was missed and the extra
+// events are simply left ungraded rather than misaligned onto the wrong
+// decision, which would attribute a verdict to an action the hero never
+// took.
+func (m *TableScreen) frozenGrades(rec engine.HandRecord) map[int]review.FrozenGrade {
+	out := make(map[int]review.FrozenGrade, len(m.grades))
+	next := 0
+	for i, e := range rec.Events {
+		if e.Kind != engine.EvAction || e.Seat != heroSeat {
+			continue
+		}
+		if next >= len(m.grades) {
+			break
+		}
+		g := m.grades[next]
+		next++
+		out[i] = review.FrozenGrade{
+			Band:        g.Grade.Label(),
+			EVLossBB:    g.EVLossBB,
+			Body:        g.Body,
+			Recommended: actionPhrase(g.Recommended),
+		}
+	}
+	return out
+}
+
+// actionPhrase names an action the way the review's "Coach:" column reads —
+// "call", "raise to 90". Sizing is included because "raise" alone is not a
+// recommendation a learner can act on.
+func actionPhrase(a engine.Action) string {
+	if a == nil {
+		return ""
+	}
+	switch v := a.(type) {
+	case engine.Bet:
+		return "bet " + v.Amount.String()
+	case engine.Raise:
+		return "raise to " + v.To.String()
+	default:
+		return a.Type().String()
+	}
 }

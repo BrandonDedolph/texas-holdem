@@ -3,6 +3,7 @@ package coach
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/BrandonDedolph/texas-holdem/internal/ai"
@@ -276,6 +277,22 @@ func TestFollowingTheCoachNeverCostsEV(t *testing.T) {
 		}
 		if g.EVLossBB != 0 {
 			t.Errorf("spot %d: taking the coach's own pick cost %.3fbb, want 0", i, g.EVLossBB)
+		}
+	}
+}
+
+func TestGradeLabel(t *testing.T) {
+	want := map[Grade]string{
+		GradeBest: "Best", GradeGood: "Good", GradeInaccuracy: "Inaccuracy",
+		GradeMistake: "Mistake", GradeBlunder: "Blunder",
+	}
+	for g, w := range want {
+		if got := g.Label(); got != w {
+			t.Errorf("Grade(%d).Label() = %q, want %q", g, got, w)
+		}
+		// String stays lowercase: it is the profile.GradeTotals key.
+		if got := g.String(); got != strings.ToLower(w) {
+			t.Errorf("Grade(%d).String() = %q, want %q", g, got, strings.ToLower(w))
 		}
 	}
 }
