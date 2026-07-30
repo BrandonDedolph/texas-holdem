@@ -2,7 +2,7 @@
 
 ![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)
 ![License](https://img.shields.io/badge/License-MIT-blue)
-![Status](https://img.shields.io/badge/Status-v1%20complete-brightgreen)
+[![Release](https://img.shields.io/github/v/release/BrandonDedolph/texas-holdem)](https://github.com/BrandonDedolph/texas-holdem/releases/latest)
 
 A terminal Texas Hold'em game built to **teach you the game**, not just simulate
 it — 6-max No-Limit cash game against AI opponents, with a live coach, guided
@@ -11,8 +11,8 @@ lessons, an equity trainer, and post-hand review. Built with
 
 ![Gameplay](assets/holdem.gif)
 
-> **Status: feature-complete for v1.** Play, lessons, trainer, coach, and
-> post-hand review all work. `make run` to play.
+> **v0.1.0 is out.** Play, lessons, trainer, coach, and post-hand review all
+> work — install below, or `make run` from source.
 >
 > | Package | |
 > |---|---|
