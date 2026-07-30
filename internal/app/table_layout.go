@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/BrandonDedolph/texas-holdem/internal/coach"
 	"github.com/BrandonDedolph/texas-holdem/internal/engine"
 	"github.com/BrandonDedolph/texas-holdem/internal/equity"
 	"github.com/BrandonDedolph/texas-holdem/internal/eval"
@@ -37,16 +38,23 @@ func (m *TableScreen) View() string {
 	if m.help.open {
 		return renderHelp("Table", m.keymap(), w, h)
 	}
+	var base string
 	switch layoutFor(w, h) {
 	case LayoutWide:
-		return m.viewWide(w, h)
+		base = m.viewWide(w, h)
 	case LayoutCompact:
-		return m.viewCompact(w, h)
+		base = m.viewCompact(w, h)
 	case LayoutTooSmall:
 		return renderTooSmall(w, h) // the App root already gates this; belt and braces
 	default:
-		return m.viewFull(w, h)
+		base = m.viewFull(w, h)
 	}
+	if m.overlay != nil {
+		// A teachable moment or the coach's expanded explanation: a modal
+		// box over the frozen table, dismissed by any key (§5.1, §5.4).
+		return renderTableOverlay(base, w, h, m.overlay)
+	}
+	return base
 }
 
 // viewFull is the 80x24 target layout: the row budget in §2.1, verbatim.
@@ -54,7 +62,7 @@ func (m *TableScreen) View() string {
 // pair, which stays glued to the bottom of the screen.
 func (m *TableScreen) viewFull(w, h int) string {
 	coach := renderCoachStrip(m.coachView(), m.coachMode, m.coachNeutral(), w)
-	rows := m.fullRows(w, strings.SplitN(coach, "\n", 2))
+	rows := m.fullRows(w, strings.SplitN(coach, "\n", coachStripRows))
 	rows = padRowsAboveFooter(rows, h, strings.Repeat(" ", w))
 	return cropHeight(strings.Join(rows, "\n"), h)
 }
@@ -80,20 +88,26 @@ func (m *TableScreen) viewWide(w, h int) string {
 	return cropHeight(strings.Join(out, "\n"), h)
 }
 
-// tickerRows renders the last two actions where the coach strip would be —
-// the wide layout shows the coach in its side panel instead.
+// tickerRows renders the last few actions where the coach strip would be —
+// the wide layout shows the coach in its side panel instead. The ticker's
+// height matches the strip's so the two layouts share one row budget.
 func (m *TableScreen) tickerRows(w int) []string {
 	th := theme.Current
-	rows := []string{"", ""}
+	rows := make([]string, coachStripRows)
 	n := len(m.recent)
-	for i := 0; i < 2 && i < n; i++ {
-		rows[1-i] = " " + th.Help.Render(clip(m.recent[n-1-i], w-1))
+	for i := 0; i < coachStripRows && i < n; i++ {
+		rows[coachStripRows-1-i] = " " + th.Help.Render(clip(m.recent[n-1-i], w-1))
 	}
 	return rows
 }
 
-// fullRows builds the 24 rows of the full layout. coach supplies rows 17-18
+// fullRows builds the 24 rows of the full layout. coach supplies rows 17-19
 // (the strip, or the wide layout's ticker); every row is exactly w cells.
+// The strip's third row came out of the old blank row between the action
+// bar and the status line — two blank rows sat there while the coach's
+// reasoning clipped mid-thought (ui-review F1). The budget is still a
+// constant 24: the strip grew to a fixed height, not a content-dependent
+// one.
 func (m *TableScreen) fullRows(w int, coach []string) []string {
 	blank := strings.Repeat(" ", w)
 	rule := theme.Current.Rule.Render(strings.Repeat(theme.G.RuleH, w))
@@ -109,16 +123,15 @@ func (m *TableScreen) fullRows(w int, coach []string) []string {
 	rows = append(rows, m.heroRows(w)...)    // 12-14
 	rows = append(rows, m.heroLineRow(w))    // 15
 	rows = append(rows, rule)                // 16
-	for i := 0; i < 2; i++ {                 // 17-18: reserved even when silent
+	for i := 0; i < coachStripRows; i++ {    // 17-19: reserved even when silent
 		line := blank
 		if i < len(coach) {
 			line = padStyledTo(coach[i], w)
 		}
 		rows = append(rows, line)
 	}
-	rows = append(rows, rule)                                      // 19
-	rows = append(rows, strings.SplitN(m.bar.View(w), "\n", 2)...) // 20-21
-	rows = append(rows, blank)                                     // 22
+	rows = append(rows, rule)                                      // 20
+	rows = append(rows, strings.SplitN(m.bar.View(w), "\n", 2)...) // 21-22
 	rows = append(rows, m.statusRow(w))                            // 23
 	rows = append(rows, m.footerRow(w))                            // 24
 	return rows
@@ -240,10 +253,31 @@ func (m *TableScreen) heroInfo(width int) string {
 	return strutRow(width, parts...)
 }
 
-// heroLineRow is the reserved hero action/grade line (row 15): the hero's
-// last action this street, joined by the coach's grade once wired.
+// heroLineRow is the reserved hero action/grade line (row 15, §5.3): the
+// hero's last decision joined by its frozen grade — "calls 85  ✗ Mistake ·
+// Fold was the play (-1.2bb)". Both persist until the hero's next decision
+// replaces them (or the showdown reveal takes the row): grades are computed
+// forever, so they must not be shown for a second (ui-review F2).
+//
+// The grade suffix is composed at render time from lastGrade and the LIVE
+// coach mode, so cycling verbosity with tab applies immediately and
+// CoachMistakes/CoachOff withhold exactly what they promise to withhold.
 func (m *TableScreen) heroLineRow(w int) string {
-	return padStyledTo("   "+theme.Current.SeatAction.Render(clip(m.heroLine, w-4)), w)
+	th := theme.Current
+	action := clip(m.heroLine, w-4)
+	suffix := ""
+	if m.heroGraded && m.lastGrade != nil && m.lastGrade.Feedback(m.coachMode.ProfileKey()) != "" {
+		suffix = gradeSummary(*m.lastGrade)
+	}
+	if suffix == "" {
+		return padStyledTo("   "+th.SeatAction.Render(action), w)
+	}
+	style := th.GradeBad
+	if m.lastGrade.Grade.GoodOrBetter() {
+		style = th.GradeGood
+	}
+	suffix = clip(suffix, w-4-visibleWidth(action)-2)
+	return padStyledTo("   "+th.SeatAction.Render(action)+"  "+style.Render(suffix), w)
 }
 
 // potRow renders the pot region: the derived pot layers in the open —
@@ -494,9 +528,14 @@ func (m *TableScreen) coachView() CoachView {
 			v.Chips = append(v.Chips, NumberChip{Label: c.Label, Value: c.Value})
 		}
 	}
+	pot := m.hand.PotTotal()
+	toCall := m.hand.ToCall(heroSeat)
+	if m.bar.State() != ActionBarWaiting && toCall > 0 {
+		// The compact layout's one number that must survive (ui-review F6).
+		v.Price = "to call " + toCall.String() + " " + theme.G.Dot + " " +
+			equity.PotOddsText(toCall, pot)
+	}
 	if len(v.Chips) == 0 {
-		pot := m.hand.PotTotal()
-		toCall := m.hand.ToCall(heroSeat)
 		if m.bar.State() != ActionBarWaiting && toCall > 0 {
 			v.Chips = append(v.Chips,
 				NumberChip{"to call", toCall.String()},
@@ -509,9 +548,13 @@ func (m *TableScreen) coachView() CoachView {
 		}
 	}
 
-	// The grade of the hero's most recent action, shown while the villains
-	// respond. Feedback returns "" when the mode withholds it.
-	if g := m.lastGrade; g != nil {
+	// The grade of the hero's most recent action. It persists past the
+	// villains' responses (ui-review F2), but the moment fresh advice is up
+	// the strip belongs to the NEW decision — the old grade stays on the
+	// hero's reserved line instead (heroLineRow) — and between hands the
+	// strip belongs to the whole hand's verdict (coachNeutral). Feedback
+	// returns "" when the mode withholds it.
+	if g := m.lastGrade; g != nil && m.advice == nil && !m.handDone {
 		if body := g.Feedback(m.coachMode.ProfileKey()); body != "" {
 			v.Grade = &GradeView{
 				Symbol: gradeSymbol(g.Grade),
@@ -523,13 +566,58 @@ func (m *TableScreen) coachView() CoachView {
 	return v
 }
 
-// coachNeutral is the street summary the reserved strip shows when the
-// coach is off — the slot stays occupied, the table never reflows.
+// coachNeutral is the summary the reserved strip shows when the coach has
+// no advice up — the slot stays occupied, the table never reflows. Between
+// hands it carries the hand's verdict, which is also the reason to press v
+// (ui-review F2): the grades were computed and frozen either way.
 func (m *TableScreen) coachNeutral() string {
-	if m.hand == nil || m.hand.Phase() == engine.PhaseComplete {
+	if m.hand == nil {
+		return "between hands"
+	}
+	if m.hand.Phase() == engine.PhaseComplete {
+		if s := m.handVerdict(); s != "" {
+			return s
+		}
 		return "between hands"
 	}
 	return m.hand.Street().String() + " " + theme.G.Dot + " pot " + m.hand.PotTotal().String()
+}
+
+// handVerdict summarizes the finished hand's frozen grades for the
+// between-hands strip: "hand over · 1 Best, 1 Mistake (-1.2bb) · v reviews".
+// It returns "" when the mode withholds it — CoachOff stays silent, and
+// CoachMistakes speaks only when a decision actually leaked (§5.4).
+func (m *TableScreen) handVerdict() string {
+	if m.coachMode == CoachOff || len(m.grades) == 0 {
+		return ""
+	}
+	var counts [5]int
+	var loss float64
+	leaked := false
+	for _, g := range m.grades {
+		if gr := int(g.Grade); gr >= 0 && gr < len(counts) {
+			counts[gr]++
+		}
+		loss += g.EVLossBB
+		if !g.Grade.GoodOrBetter() {
+			leaked = true
+		}
+	}
+	if m.coachMode == CoachMistakes && !leaked {
+		return ""
+	}
+	var parts []string
+	for gr := coach.GradeBest; gr <= coach.GradeBlunder; gr++ {
+		if n := counts[gr]; n > 0 {
+			parts = append(parts, strconv.Itoa(n)+" "+gr.Label())
+		}
+	}
+	dot := " " + theme.G.Dot + " "
+	s := "hand over" + dot + strings.Join(parts, ", ")
+	if loss >= 0.05 {
+		s += " (-" + strconv.FormatFloat(loss, 'f', 1, 64) + "bb)"
+	}
+	return s + dot + "v reviews"
 }
 
 // --- Compact ledger (<80 cols, §2.7) ----------------------------------------

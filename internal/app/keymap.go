@@ -57,6 +57,7 @@ const (
 	ActSpeedUp
 	ActSpeedDown
 	ActReview // open the hand review (between hands)
+	ActExpand // expand the coach's full explanation (docs/design-tui.md §5.1)
 )
 
 // Binding ties one action to the keys that trigger it and the legend text
@@ -109,6 +110,11 @@ var (
 	bindRight  = Binding{ActRight, []string{"right", "l"}, "right/l", "next value"}
 	bindSelect = Binding{ActSelect, []string{"enter", " "}, "enter/space", "select"}
 	bindHelp   = Binding{ActHelp, []string{"?"}, "?", "help"}
+
+	// bindExpand opens the coach's full-explanation overlay (§5.1). It is
+	// bound in both hero-turn states — the strip's [e more] marker can show
+	// while sizing too, and a marker that names a dead key would lie.
+	bindExpand = Binding{ActExpand, []string{"e"}, "e", "expand the coach's full explanation"}
 )
 
 // Shared help strings for the sizing digit family (see tableSizingKeys).
@@ -206,6 +212,7 @@ var (
 		Binding{ActBet, []string{"b"}, "b", "bet (opens sizing)"},
 		Binding{ActRaise, []string{"r"}, "r", "raise (opens sizing)"},
 		Binding{ActAllIn, []string{"a"}, "a", "all-in (confirm with enter)"},
+		bindExpand,
 	}, tableSharedKeys...)
 
 	// The preset and digit bindings share legend labels ("1-5", "0/6-9") so
@@ -228,6 +235,7 @@ var (
 		Binding{ActRight, []string{"right", "l"}, "right/l", "nudge up one big blind"},
 		Binding{ActSelect, []string{"enter"}, "enter", "confirm bet/raise"},
 		Binding{ActBack, []string{"esc"}, "esc", "cancel sizing"},
+		bindExpand,
 		bindHelp,
 	}
 

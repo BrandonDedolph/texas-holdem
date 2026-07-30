@@ -1,12 +1,13 @@
 package app
 
 import (
-	"github.com/BrandonDedolph/texas-holdem/internal/profile"
 	"strings"
 	"testing"
 
+	"github.com/BrandonDedolph/texas-holdem/internal/coach"
 	"github.com/BrandonDedolph/texas-holdem/internal/engine"
 	"github.com/BrandonDedolph/texas-holdem/internal/equity"
+	"github.com/BrandonDedolph/texas-holdem/internal/profile"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -44,6 +45,12 @@ type tableScenario struct {
 	speed  Speed
 	coach  CoachMode
 	seed   uint64
+
+	// prof lets a test watch profile side effects (teachable moments).
+	// When nil, buildTable seats a fresh profile with every moment already
+	// seen, so scenarios exercise the table, not the first-contact popups —
+	// the moment tests opt in with an explicit fresh profile.
+	prof *profile.Profile
 }
 
 // buildTable constructs a TableScreen, deals the first hand, and replays
@@ -66,7 +73,11 @@ func buildTable(t *testing.T, sc tableScenario, w, h int) *TableScreen {
 		opps[s] = &scriptedOpponent{name: villainNames[s], script: sc.script[s]}
 	}
 
-	m := newTableScreen(cfg, nil, profile.NewProfile(), stacks, opps)
+	prof := sc.prof
+	if prof == nil {
+		prof = profileWithMomentsSeen()
+	}
+	m := newTableScreen(cfg, nil, prof, stacks, opps)
 	m.seed, m.seeded = sc.seed, true
 	m.Update(tea.WindowSizeMsg{Width: w, Height: h})
 	m.Init()
@@ -76,6 +87,17 @@ func buildTable(t *testing.T, sc tableScenario, w, h int) *TableScreen {
 		pumpTable(t, m)
 	}
 	return m
+}
+
+// profileWithMomentsSeen returns a fresh profile with every teachable
+// moment marked seen, so table scenarios settle without a popup waiting for
+// a keypress.
+func profileWithMomentsSeen() *profile.Profile {
+	p := profile.NewProfile()
+	for _, mo := range coach.Moments() {
+		p.MarkMomentSeen(mo.ID)
+	}
+	return p
 }
 
 // pumpTable stands in for the Bubble Tea runtime's timers: it injects the
@@ -382,6 +404,154 @@ func TestTableWideLayoutShowsCoachPanel(t *testing.T) {
 	view := stripANSI(m.View())
 	if !strings.Contains(view, "COACH") {
 		t.Error("wide layout must render the coach side panel")
+	}
+}
+
+// heroLineOf returns the hero's reserved action/grade line — row 15 of the
+// 80x24 full layout — ANSI-stripped, when it carries the given action text;
+// "" otherwise. Addressing the fixed row is the point: the budget promises
+// the line is always exactly there.
+func heroLineOf(view, action string) string {
+	rows := strings.Split(stripANSI(view), "\n")
+	const heroLineRow = 14 // row 15, zero-indexed
+	if len(rows) <= heroLineRow || !strings.Contains(rows[heroLineRow], action) {
+		return ""
+	}
+	return rows[heroLineRow]
+}
+
+// TestGradePersistsUntilNextDecision is the F2 regression: the frozen grade
+// of the hero's last action must still be on screen when the hero's NEXT
+// turn arms — at every speed, including Instant, where the old
+// grade-while-villains-respond window never rendered a single frame.
+func TestGradePersistsUntilNextDecision(t *testing.T) {
+	for _, speed := range []Speed{SpeedLearn, SpeedNormal, SpeedFast, SpeedInstant} {
+		t.Run(speed.String(), func(t *testing.T) {
+			sc := scenarioFlopChoosing() // hero calls preflop, flop checks to hero
+			sc.speed = speed
+			m := buildTable(t, sc, 80, 24)
+			if speed == SpeedLearn {
+				if !m.paused {
+					t.Fatal("Learn speed should pause on the flop")
+				}
+				m.Update(key(" "))
+				pumpTable(t, m)
+			}
+			if m.bar.State() != ActionBarChoosing || m.hand.Street() != engine.Flop {
+				t.Fatalf("setup: want the hero's flop turn, got %v on %v", m.bar.State(), m.hand.Street())
+			}
+
+			// The preflop call (an Inaccuracy against the coach's raise) is
+			// still on the hero's reserved line, grade attached.
+			line := heroLineOf(m.View(), "calls 10")
+			if line == "" {
+				t.Fatalf("hero's last action left the screen before his next decision:\n%s",
+					stripANSI(m.View()))
+			}
+			if !strings.Contains(line, "Inaccuracy") {
+				t.Errorf("hero line %q lost the frozen grade", line)
+			}
+
+			// The next decision replaces it — grades never stack or linger
+			// past the action they judged.
+			m.Update(key("x"))
+			pumpTable(t, m)
+			view := stripANSI(m.View())
+			if got := heroLineOf(view, "checks"); got == "" || !strings.Contains(got, "Best") {
+				t.Errorf("next decision's grade must take over the line, got %q", got)
+			}
+			if heroLineOf(view, "calls 10") != "" {
+				t.Errorf("stale decision still on screen after the next one:\n%s", view)
+			}
+		})
+	}
+}
+
+// TestGradeRespectsVerbosityOnHeroLine: the suffix is composed at render
+// time from the LIVE mode — Off shows the action but never the opinion, and
+// Mistakes withholds the grade when the decision was fine.
+func TestGradeRespectsVerbosityOnHeroLine(t *testing.T) {
+	sc := scenarioFlopChoosing()
+	sc.coach = CoachOff
+	m := buildTable(t, sc, 80, 24)
+	if line := heroLineOf(m.View(), "calls 10"); line == "" || strings.Contains(line, "Inaccuracy") {
+		t.Errorf("CoachOff must record silently; hero line = %q", line)
+	}
+	// Cycling to Full mid-hand reveals the already-frozen grade — display
+	// is a live choice, the grade never was.
+	m.coachMode = CoachFull
+	if line := heroLineOf(m.View(), "calls 10"); !strings.Contains(line, "Inaccuracy") {
+		t.Errorf("cycling to Full must reveal the recorded grade; hero line = %q", line)
+	}
+
+	sc = scenarioFlopChoosing()
+	sc.coach = CoachMistakes
+	sc.keys = append(sc.keys, "x") // flop check matches the coach: Best
+	m = buildTable(t, sc, 80, 24)
+	if line := heroLineOf(m.View(), "checks"); line == "" || strings.Contains(line, "Best") {
+		t.Errorf("Mistakes mode must stay silent on a good decision; hero line = %q", line)
+	}
+}
+
+// TestCompactShowsPotOddsFacingBet is the F6 regression: the 60x20 ledger
+// must never drop the price of a decision — in any coach mode.
+func TestCompactShowsPotOddsFacingBet(t *testing.T) {
+	for _, mode := range []CoachMode{CoachFull, CoachMistakes, CoachOff} {
+		t.Run(mode.String(), func(t *testing.T) {
+			sc := scenarioPreflop() // hero on the button facing the blind: 10 into 15
+			sc.coach = mode
+			m := buildTable(t, sc, 60, 20)
+			view := stripANSI(m.View())
+			want := equity.PotOddsText(10, 15)
+			if !strings.Contains(view, want) {
+				t.Errorf("compact %v frame facing a bet has no price %q:\n%s", mode, want, view)
+			}
+		})
+	}
+}
+
+// TestExpandOverlayShowsFullReasoning: the e key opens the §5.1 overlay
+// with the reasoning the strip clipped, and any key restores the exact
+// frame underneath.
+func TestExpandOverlayShowsFullReasoning(t *testing.T) {
+	m := buildTable(t, scenarioFlopChoosing(), 80, 24)
+	if m.advice == nil {
+		t.Fatal("setup: the hero's turn should carry advice")
+	}
+	base := m.View()
+	if !strings.Contains(stripANSI(base), expandMarker) {
+		t.Fatalf("this spot's reasoning should overflow the strip:\n%s", stripANSI(base))
+	}
+
+	m.Update(key("e"))
+	view := stripANSI(m.View())
+	// "(limped)" is in the clipped tail of the strip — the overlay must
+	// carry the whole thought.
+	if !strings.Contains(view, "(limped)") {
+		t.Errorf("overlay must show the clipped reasoning in full:\n%s", view)
+	}
+	if !strings.Contains(view, "any key continues") {
+		t.Error("overlay must say how to dismiss itself")
+	}
+
+	m.Update(key("z"))
+	if m.View() != base {
+		t.Error("dismissing the overlay must restore the exact previous frame")
+	}
+}
+
+// TestExpandRespectsVerbosity: at Mistakes/Off the e key must not open a
+// back door to the opinion the mode withholds.
+func TestExpandRespectsVerbosity(t *testing.T) {
+	for _, mode := range []CoachMode{CoachMistakes, CoachOff} {
+		sc := scenarioFlopChoosing()
+		sc.coach = mode
+		m := buildTable(t, sc, 80, 24)
+		before := m.View()
+		m.Update(key("e"))
+		if m.View() != before {
+			t.Errorf("%v: e must do nothing — expanding would reveal the withheld opinion", mode)
+		}
 	}
 }
 
