@@ -2,27 +2,27 @@
 
 ![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)
 ![License](https://img.shields.io/badge/License-MIT-blue)
-![Status](https://img.shields.io/badge/Status-playable-brightgreen)
+![Status](https://img.shields.io/badge/Status-v1%20complete-brightgreen)
 
 A terminal Texas Hold'em game built to **teach you the game**, not just simulate
 it — 6-max No-Limit cash game against AI opponents, with a live coach, guided
 lessons, an equity trainer, and post-hand review. Built with
 [Bubble Tea](https://github.com/charmbracelet/bubbletea).
 
-> **Status: playable.** You can deal hands against five AI opponents with a
-> live coach. Lessons and the trainer are not wired to the menu yet.
+> **Status: feature-complete for v1.** Play, lessons, trainer, coach, and
+> post-hand review all work. `make run` to play.
 >
-> | Package | State |
+> | Package | |
 > |---|---|
 > | `internal/engine` — betting, side pots, table lifecycle | ✅ |
 > | `internal/eval` — 7-card evaluator (32 ns/op, 0 allocs) | ✅ |
 > | `internal/equity` — ranges, exact enumeration, outs | ✅ |
 > | `internal/ai` — opponents, five archetypes | ✅ |
 > | `internal/coach` — advice, EV-loss grading, moments | ✅ |
+> | `internal/tutorial` — 13-lesson curriculum | ✅ |
+> | `internal/trainer` — four generated drill modes | ✅ |
 > | `internal/review` — post-hand replay | ✅ |
-> | `internal/tutorial` — 13-lesson curriculum | ✅ (screen pending) |
-> | `internal/app` — menus, table, hand review | ✅ |
-> | `internal/trainer` — standalone drills | ⬜ next |
+> | `internal/app` — menus, table, lessons, trainer, review | ✅ |
 
 ## The idea
 
@@ -43,7 +43,7 @@ result — right play / bad result, wrong play / lucky result — and the headli
 session statistic is **decision accuracy, not chips won**. Watching those two
 numbers diverge over a session *is* the variance lesson.
 
-## Planned features
+## Features
 
 **Play**
 - 6-max No-Limit Hold'em cash game — fixed blinds, rebuy anytime
@@ -92,7 +92,7 @@ make test       # Run tests
 make lint       # Run linter
 ```
 
-Prebuilt binaries and a one-line installer will land with the first release.
+Prebuilt binaries and a one-line installer land with the first tagged release.
 
 ## Design documents
 
