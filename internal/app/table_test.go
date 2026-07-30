@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -404,6 +405,104 @@ func TestTableWideLayoutShowsCoachPanel(t *testing.T) {
 	view := stripANSI(m.View())
 	if !strings.Contains(view, "COACH") {
 		t.Error("wide layout must render the coach side panel")
+	}
+}
+
+// TestWideLayoutShowsFullReasoning (ui-review §5 q1): the same spot whose
+// reasoning earns the [e more] clip at 80 cols must show the whole thought
+// in the wide panel — the wide layout is the reward for having the room.
+func TestWideLayoutShowsFullReasoning(t *testing.T) {
+	narrow := buildTable(t, scenarioFlopChoosing(), 80, 24)
+	if !strings.Contains(stripANSI(narrow.View()), expandMarker) {
+		t.Fatal("premise: this spot's reasoning should overflow the 80-col strip")
+	}
+
+	wide := buildTable(t, scenarioFlopChoosing(), 104, 30)
+	view := stripANSI(wide.View())
+	// "(limped)" is the clipped tail at 80 cols (see the expand-overlay
+	// test); wide must deliver it inline, with no marker to press.
+	if !strings.Contains(view, "(limped)") {
+		t.Errorf("wide layout must carry the full reasoning inline:\n%s", view)
+	}
+	if strings.Contains(view, expandMarker) {
+		t.Errorf("wide layout must never need the e overlay:\n%s", view)
+	}
+}
+
+// TestWideLayoutLongerActionLog: the wide ticker keeps twice the strip's
+// history. The side-pot spot produces exactly six actions — the first two
+// would have scrolled off the old 4-entry buffer.
+func TestWideLayoutLongerActionLog(t *testing.T) {
+	m := buildTable(t, scenarioSidePot(), 104, 30)
+	view := stripANSI(m.View())
+	for _, want := range []string{"Cole folds", "Ivy folds", "YOU raises to 60", "Nia all-in 700"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("wide action log lost %q:\n%s", want, view)
+		}
+	}
+}
+
+// TestSessionScoreboardBetweenHands (ui-review §5 q3): after a hand ends,
+// the 80-col strip shows the running session pair computed from the session
+// counters — accuracy and net side by side, free to disagree.
+func TestSessionScoreboardBetweenHands(t *testing.T) {
+	m := buildTable(t, scenarioShowdown(), 80, 24)
+	if !m.handDone {
+		t.Fatal("setup: scenario should end between hands")
+	}
+	view := stripANSI(m.View())
+
+	// Rendered from the accumulated counters, not recomputed.
+	if m.sessionGraded == 0 || m.sessionHands != 1 {
+		t.Fatalf("setup: session counters not accumulated (hands=%d graded=%d)",
+			m.sessionHands, m.sessionGraded)
+	}
+	wantAcc := "decisions " + strconv.Itoa((m.sessionGood*100+m.sessionGraded/2)/m.sessionGraded) +
+		"% good (" + strconv.Itoa(m.sessionGood) + "/" + strconv.Itoa(m.sessionGraded) + ")"
+	wantNet := "net " + signedChips(m.sessionNet)
+	if !strings.Contains(view, wantAcc) {
+		t.Errorf("between-hands frame lost the session accuracy %q:\n%s", wantAcc, view)
+	}
+	if !strings.Contains(view, wantNet) {
+		t.Errorf("between-hands frame lost the session net %q:\n%s", wantNet, view)
+	}
+
+	// Mid-hand the strip belongs to the live decision; the pair waits.
+	live := buildTable(t, scenarioPreflop(), 80, 24)
+	if v := stripANSI(live.View()); strings.Contains(v, "session ") {
+		t.Errorf("session line must not render mid-hand:\n%s", v)
+	}
+}
+
+// TestMistakesStripSilentUntilError (ui-review §5 q5): at 80 cols the
+// Mistakes strip renders three blank rows before the hero acts — the price
+// stays on the action bar — and the grade still gets recorded when the hero
+// errs, surfacing on the reserved hero line.
+func TestMistakesStripSilentUntilError(t *testing.T) {
+	sc := scenarioPreflop()
+	sc.coach = CoachMistakes
+	m := buildTable(t, sc, 80, 24)
+	rows := strings.Split(stripANSI(m.View()), "\n")
+	for i := 16; i <= 18; i++ { // rows 17-19: the reserved strip
+		if got := strings.TrimSpace(rows[i]); got != "" {
+			t.Errorf("Mistakes strip row %d must be blank before acting, got %q", i+1, got)
+		}
+	}
+	// The price is still on screen — once, in the action bar.
+	if view := strings.Join(rows, "\n"); !strings.Contains(view, "pot odds 1.5:1 (40%)") {
+		t.Errorf("price must stay on the action bar:\n%s", view)
+	}
+
+	// The hero errs (the call is an Inaccuracy against the coach's raise):
+	// the grade is recorded and shown, even though the advice never was.
+	sc = scenarioFlopChoosing()
+	sc.coach = CoachMistakes
+	m = buildTable(t, sc, 80, 24)
+	if len(m.grades) == 0 {
+		t.Fatal("Mistakes mode must keep recording grades")
+	}
+	if line := heroLineOf(m.View(), "calls 10"); !strings.Contains(line, "Inaccuracy") {
+		t.Errorf("Mistakes mode must show the grade after an error; hero line = %q", line)
 	}
 }
 

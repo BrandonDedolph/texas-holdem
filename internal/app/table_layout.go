@@ -67,10 +67,11 @@ func (m *TableScreen) viewFull(w, h int) string {
 	return cropHeight(strings.Join(rows, "\n"), h)
 }
 
-// viewWide (>=104x28) swaps the 2-row coach strip for a bordered side panel
-// and reclaims the strip rows for the action ticker (§2.6). The left column
-// is the full layout at the remaining width, so every full-layout invariant
-// carries over unchanged.
+// viewWide (>=104x28) swaps the coach strip for a bordered side panel that
+// carries the FULL reasoning (never the [e more] clip) plus the session
+// scoreboard, and reclaims — and doubles — the strip rows for the action
+// ticker (§2.6, ui-review §5 q1). The left column is the full layout at the
+// remaining width, so every full-layout invariant carries over unchanged.
 func (m *TableScreen) viewWide(w, h int) string {
 	leftW := w - coachPanelWidth - 2
 	rows := m.fullRows(leftW, m.tickerRows(leftW))
@@ -88,26 +89,34 @@ func (m *TableScreen) viewWide(w, h int) string {
 	return cropHeight(strings.Join(out, "\n"), h)
 }
 
-// tickerRows renders the last few actions where the coach strip would be —
-// the wide layout shows the coach in its side panel instead. The ticker's
-// height matches the strip's so the two layouts share one row budget.
+// wideTickerRows is the wide layout's action-log height: double the strip's
+// budget, paid for by the rows the wide breakpoint guarantees (>=28 high;
+// the frame is 27 rows before padding). A fixed constant — the log region
+// never grows with content.
+const wideTickerRows = 6
+
+// tickerRows renders the recent actions where the coach strip would be —
+// the wide layout shows the coach in its side panel instead, and spends the
+// reclaimed rows (plus three of the wide height budget) on a longer log,
+// bottom-aligned so the newest action is always in the same place.
 func (m *TableScreen) tickerRows(w int) []string {
 	th := theme.Current
-	rows := make([]string, coachStripRows)
+	rows := make([]string, wideTickerRows)
 	n := len(m.recent)
-	for i := 0; i < coachStripRows && i < n; i++ {
-		rows[coachStripRows-1-i] = " " + th.Help.Render(clip(m.recent[n-1-i], w-1))
+	for i := 0; i < wideTickerRows && i < n; i++ {
+		rows[wideTickerRows-1-i] = " " + th.Help.Render(clip(m.recent[n-1-i], w-1))
 	}
 	return rows
 }
 
-// fullRows builds the 24 rows of the full layout. coach supplies rows 17-19
-// (the strip, or the wide layout's ticker); every row is exactly w cells.
-// The strip's third row came out of the old blank row between the action
-// bar and the status line — two blank rows sat there while the coach's
-// reasoning clipped mid-thought (ui-review F1). The budget is still a
-// constant 24: the strip grew to a fixed height, not a content-dependent
-// one.
+// fullRows builds the rows of the full layout. coach supplies the reserved
+// rows between the rules — the 3-row strip at 80 cols, the wide layout's
+// 6-row ticker — and every row is exactly w cells. The strip's third row
+// came out of the old blank row between the action bar and the status line —
+// two blank rows sat there while the coach's reasoning clipped mid-thought
+// (ui-review F1). The budget is still a constant per layout (24 rows at 80
+// cols, 27 wide): the coach region has a fixed height per breakpoint, never
+// a content-dependent one.
 func (m *TableScreen) fullRows(w int, coach []string) []string {
 	blank := strings.Repeat(" ", w)
 	rule := theme.Current.Rule.Render(strings.Repeat(theme.G.RuleH, w))
@@ -123,12 +132,8 @@ func (m *TableScreen) fullRows(w int, coach []string) []string {
 	rows = append(rows, m.heroRows(w)...)    // 12-14
 	rows = append(rows, m.heroLineRow(w))    // 15
 	rows = append(rows, rule)                // 16
-	for i := 0; i < coachStripRows; i++ {    // 17-19: reserved even when silent
-		line := blank
-		if i < len(coach) {
-			line = padStyledTo(coach[i], w)
-		}
-		rows = append(rows, line)
+	for i := range coach {                   // 17-…: reserved even when silent
+		rows = append(rows, padStyledTo(coach[i], w))
 	}
 	rows = append(rows, rule)                                      // 20
 	rows = append(rows, strings.SplitN(m.bar.View(w), "\n", 2)...) // 21-22
@@ -515,8 +520,16 @@ func (m *TableScreen) seatView(s engine.Seat) components.SeatView {
 // available in every mode — silence is a display choice, not an amnesty.
 func (m *TableScreen) coachView() CoachView {
 	v := CoachView{}
+	// The session scoreboard rides along in every mode: decision accuracy
+	// and net chips are the player's own ledger, not coaching advice, and
+	// letting them visibly disagree is the variance lesson (DESIGN.md §1).
+	v.Session = m.sessionChips()
+	v.BetweenHands = m.hand == nil || m.handDone || m.hand.Phase() == engine.PhaseComplete
 	if m.hand == nil {
 		return v
+	}
+	if v.BetweenHands {
+		v.Verdict = m.handVerdict()
 	}
 
 	if m.advice != nil {
@@ -567,20 +580,46 @@ func (m *TableScreen) coachView() CoachView {
 }
 
 // coachNeutral is the summary the reserved strip shows when the coach has
-// no advice up — the slot stays occupied, the table never reflows. Between
-// hands it carries the hand's verdict, which is also the reason to press v
-// (ui-review F2): the grades were computed and frozen either way.
+// no advice up — the slot stays occupied, the table never reflows. The
+// finished hand's verdict travels separately (CoachView.Verdict) so each
+// mode can withhold or show it without string-sniffing this placeholder.
 func (m *TableScreen) coachNeutral() string {
-	if m.hand == nil {
-		return "between hands"
-	}
-	if m.hand.Phase() == engine.PhaseComplete {
-		if s := m.handVerdict(); s != "" {
-			return s
-		}
+	if m.hand == nil || m.hand.Phase() == engine.PhaseComplete {
 		return "between hands"
 	}
 	return m.hand.Street().String() + " " + theme.G.Dot + " pot " + m.hand.PotTotal().String()
+}
+
+// sessionChips is the running session scoreboard: hands played, decisions
+// graded good-or-better as a percentage, and net chips — read straight from
+// the counters RecordSession persists, never recomputed. Accuracy and net
+// are SEPARATE chips by design: blending them into one score would erase
+// the divergence the product exists to teach (DESIGN.md §1, ui-review §5
+// q3). Empty until the sitting's first hand finishes.
+func (m *TableScreen) sessionChips() []NumberChip {
+	if m.sessionHands == 0 {
+		return nil
+	}
+	acc := "none graded"
+	if m.sessionGraded > 0 {
+		pct := (m.sessionGood*100 + m.sessionGraded/2) / m.sessionGraded
+		acc = strconv.Itoa(pct) + "% good (" + strconv.Itoa(m.sessionGood) + "/" +
+			strconv.Itoa(m.sessionGraded) + ")"
+	}
+	return []NumberChip{
+		{"hands", strconv.Itoa(m.sessionHands)},
+		{"decisions", acc},
+		{"net", signedChips(m.sessionNet)},
+	}
+}
+
+// signedChips renders a net amount with an explicit sign — a scoreboard
+// figure must say which way it points even when it points up.
+func signedChips(c engine.Chips) string {
+	if c >= 0 {
+		return "+" + c.String()
+	}
+	return c.String()
 }
 
 // handVerdict summarizes the finished hand's frozen grades for the
