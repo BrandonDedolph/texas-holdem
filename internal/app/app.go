@@ -193,8 +193,16 @@ func (a *App) newScreen(screen Screen, data interface{}) tea.Model {
 			}
 		}
 		return NewHandReview(model, returnTo)
-	case ScreenLessons, ScreenTrainer:
-		// TODO(wire-lessons) TODO(wire-trainer): later wave.
+	case ScreenLessons:
+		l := NewLessons(a.profile, a.prefs)
+		if req, ok := data.(LessonRequest); ok {
+			// Open declines a locked lesson; the list then explains why
+			// rather than silently landing on the curriculum.
+			l.Open(req.LessonID)
+		}
+		return l
+	case ScreenTrainer:
+		// TODO(wire-trainer): later wave.
 		return newComingSoon(screen)
 	default:
 		return NewMainMenu()

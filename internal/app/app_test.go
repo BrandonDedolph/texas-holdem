@@ -133,10 +133,24 @@ func TestWindowSizeForwardedBeforeInit(t *testing.T) {
 	a := newTestApp(t)
 	drive(t, a, tea.WindowSizeMsg{Width: 100, Height: 30})
 
-	drive(t, a, NavigateMsg{Screen: ScreenLessons})
-	cs := a.models[ScreenLessons].(*ComingSoon)
+	// Any freshly constructed screen will do; ScreenTrainer is the one still
+	// on a placeholder, whose size fields are directly readable.
+	drive(t, a, NavigateMsg{Screen: ScreenTrainer})
+	cs := a.models[ScreenTrainer].(*ComingSoon)
 	if cs.width != 100 || cs.height != 30 {
 		t.Errorf("new screen sized %dx%d before Init, want 100x30", cs.width, cs.height)
+	}
+}
+
+// TestLessonsRoutesToTheCurriculum pins that the menu entry reaches the real
+// screen rather than a placeholder — the failure mode being a shipped build
+// whose Lessons item still says "coming soon".
+func TestLessonsRoutesToTheCurriculum(t *testing.T) {
+	a := newTestApp(t)
+	drive(t, a, tea.WindowSizeMsg{Width: 80, Height: 24})
+	drive(t, a, NavigateMsg{Screen: ScreenLessons})
+	if _, ok := a.models[ScreenLessons].(*Lessons); !ok {
+		t.Fatalf("ScreenLessons routed to %T, want *Lessons", a.models[ScreenLessons])
 	}
 }
 
@@ -306,14 +320,17 @@ func TestMainMenuRoutes(t *testing.T) {
 		t.Fatalf("esc from setup should return to the menu, got %v", a.current)
 	}
 
-	// Lessons and Trainer land on honest placeholders.
+	// Lessons opens the real curriculum.
 	drive(t, a, key("down"))
 	drive(t, a, key("enter"))
 	if a.current != ScreenLessons {
 		t.Fatalf("second row should open Lessons, got %v", a.current)
 	}
-	if view := a.View(); !strings.Contains(view, "Coming soon") {
-		t.Error("Lessons placeholder must say it is coming soon")
+	if view := a.View(); strings.Contains(view, "Coming soon") {
+		t.Error("Lessons still shows a placeholder")
+	}
+	if view := a.View(); !strings.Contains(view, "Hand Rankings") {
+		t.Error("Lessons should list the curriculum")
 	}
 }
 
