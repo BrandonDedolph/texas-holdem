@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/BrandonDedolph/texas-holdem/internal/coach"
 	"strings"
 
 	"github.com/BrandonDedolph/texas-holdem/internal/ui/theme"
@@ -26,6 +27,20 @@ type GradeView struct {
 	Symbol string
 	Text   string
 	Good   bool
+}
+
+// gradeSymbol is the one-character marker for a grade band. Display only —
+// the coach package names bands ("inaccuracy"), and how they are drawn is
+// the UI's business.
+func gradeSymbol(g coach.Grade) string {
+	switch {
+	case g.GoodOrBetter():
+		return theme.G.Good
+	case g == coach.GradeInaccuracy:
+		return theme.G.Query
+	default:
+		return theme.G.Bad
+	}
 }
 
 // CoachView is everything the coach region can show for the current

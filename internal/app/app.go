@@ -172,12 +172,12 @@ func (a *App) newScreen(screen Screen, data interface{}) tea.Model {
 		return NewQuickReference()
 	case ScreenTable:
 		if cfg, ok := data.(TableConfig); ok {
-			return NewTableScreen(cfg, a.prefs)
+			return NewTableScreen(cfg, a.prefs, a.profile)
 		}
 		// Navigating to the table without a payload and without a cached
 		// session (e.g. a future "resume" shortcut): fall back to the
 		// profile's last-used setup rather than refusing to play.
-		return NewTableScreen(a.defaultTableConfig(), a.prefs)
+		return NewTableScreen(a.defaultTableConfig(), a.prefs, a.profile)
 	case ScreenHandReview:
 		// The review replays the cached table session's last completed hand.
 		// No session (or no finished hand yet) gets the screen's honest empty

@@ -40,7 +40,7 @@ func legendScreens(t *testing.T) []legendScreen {
 		// static keymap. The state-dependent maps are probed by the
 		// TestTable* legend tests below.
 		{"Table", NewTableScreen(TableConfig{SmallBlind: 5, BigBlind: 10,
-			Stack: 1000, Speed: SpeedInstant}, prefs)},
+			Stack: 1000, Speed: SpeedInstant}, prefs, profile.NewProfile())},
 	}
 	for _, s := range screens {
 		s.model.Update(tea.WindowSizeMsg{Width: 80, Height: 24})

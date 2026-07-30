@@ -155,12 +155,25 @@ var templates = []template{
 			// The rule of 4 prices a flop draw over two cards; the rule
 			// of 2 prices a turn draw over one. River draws don't exist,
 			// and the strategy never emits an OutsFact there.
+			rule, pct := "4", of.Report.RuleOf4
 			if v.Street == engine.Turn {
-				return "Your " + cf.Draw.String() + " has about " + n + " outs — rule of 2: " +
-					n + "×2 ≈ " + roundPct(of.Report.RuleOf2) + "."
+				rule, pct = "2", of.Report.RuleOf2
 			}
-			return "Your " + cf.Draw.String() + " has about " + n + " outs — rule of 4: " +
-				n + "×4 ≈ " + roundPct(of.Report.RuleOf4) + "."
+			shortcut := " — rule of " + rule + ": " + n + "×" + rule + " ≈ " + roundPct(pct) + "."
+
+			// The named draw gets its own textbook count, not the total.
+			// Discounted folds in pair outs and half-credits tainted ones, so
+			// attaching it to the draw's name would teach "a gutshot is 8.5
+			// outs" — precisely the number a learner must not memorize. Name
+			// the canonical figure first, then the total, and say what the
+			// difference is made of.
+			if canon, ok := canonicalOuts(cf.Draw); ok && outsDiffer(canon, of.Report.Discounted) {
+				// One sentence: the body is capped at four, and a template
+				// that quietly emitted two would push a later one off.
+				return "A " + cf.Draw.String() + " is " + strconv.Itoa(canon) +
+					" outs, and counting cards that pair you about " + n + " improve you" + shortcut
+			}
+			return "Your " + cf.Draw.String() + " has about " + n + " outs" + shortcut
 		},
 	},
 	{
@@ -351,4 +364,32 @@ func mustFact(r ai.Rationale, k ai.FactKind) ai.Fact {
 		panic("coach: template cited undeclared fact kind " + k.String())
 	}
 	return f
+}
+
+// canonicalOuts is the textbook out count for a draw — the number a player
+// should be able to recite at a table. It is deliberately the naive count,
+// not the range-discounted one: "a flush draw is 9 outs" is the fact worth
+// memorizing, and the discounting is a refinement layered on top of it.
+func canonicalOuts(d ai.DrawClass) (int, bool) {
+	switch d {
+	case ai.Gutshot:
+		return 4, true
+	case ai.OESD:
+		return 8, true
+	case ai.FlushDraw:
+		return 9, true
+	case ai.ComboDraw:
+		return 15, true
+	default:
+		return 0, false
+	}
+}
+
+// outsDiffer reports whether the discounted count is far enough from the
+// textbook one to be worth distinguishing. Half an out is rounding noise; a
+// whole out means the totals genuinely disagree and the learner should be
+// told why.
+func outsDiffer(canonical int, discounted float64) bool {
+	d := discounted - float64(canonical)
+	return d > 1 || d < -1
 }

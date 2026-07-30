@@ -45,6 +45,11 @@ type Glyphs struct {
 
 	// Position badges (superscript in the Unicode set).
 	BadgeUTG, BadgeHJ, BadgeCO, BadgeBTN, BadgeSB, BadgeBB string
+
+	// Grade markers for coach feedback. One cell each: Good marks a decision
+	// worth repeating, Bad one that leaked, Query the middle band where the
+	// call was defensible but not the best available.
+	Good, Bad, Query string
 }
 
 // Unicode returns the full-fidelity glyph set.
@@ -86,6 +91,10 @@ func Unicode() Glyphs {
 		BadgeBTN: "ᴮᵀᴺ",
 		BadgeSB:  "ˢᴮ",
 		BadgeBB:  "ᴮᴮ",
+
+		Good:  "✔",
+		Bad:   "✗",
+		Query: "?",
 	}
 }
 
@@ -130,6 +139,10 @@ func ASCII() Glyphs {
 		BadgeBTN: "BTN",
 		BadgeSB:  "SB",
 		BadgeBB:  "BB",
+
+		Good:  "+",
+		Bad:   "x",
+		Query: "?",
 	}
 }
 

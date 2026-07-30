@@ -470,26 +470,55 @@ func (m *TableScreen) seatView(s engine.Seat) components.SeatView {
 	return v
 }
 
-// coachView assembles what the coach region shows. Until internal/coach
-// lands this is numbers only — pot odds are the scoreboard, not coaching,
-// so showing them is honest at every verbosity. TODO(wire-coach): map the
-// real coach.Advice / GradedDecision onto CoachView here.
+// coachView assembles what the coach region shows: the live recommendation
+// while it is the hero's turn, the grade of the hero's last action while the
+// villains respond, and always the numbers.
+//
+// Verbosity is applied by the renderer, not here, with one exception: at
+// CoachMistakes the opinion is withheld before acting while the numbers stay
+// (pot odds are the scoreboard a HUD-less player must compute anyway; showing
+// them is not coaching). Building the advice regardless keeps grading
+// available in every mode — silence is a display choice, not an amnesty.
 func (m *TableScreen) coachView() CoachView {
 	v := CoachView{}
 	if m.hand == nil {
 		return v
 	}
-	pot := m.hand.PotTotal()
-	toCall := m.hand.ToCall(heroSeat)
-	if m.bar.State() != ActionBarWaiting && toCall > 0 {
-		v.Chips = append(v.Chips,
-			NumberChip{"to call", toCall.String()},
-			NumberChip{"pot odds", equity.PotOddsText(toCall, pot)},
-		)
-	} else if pot > 0 {
-		v.Chips = append(v.Chips,
-			NumberChip{"pot", pot.String() + " (" + m.hand.Blinds().BB(pot) + ")"},
-		)
+
+	if m.advice != nil {
+		if m.coachMode == CoachFull {
+			v.Headline = m.advice.Headline
+			v.Body = m.advice.Body
+		}
+		for _, c := range m.advice.Numbers {
+			v.Chips = append(v.Chips, NumberChip{Label: c.Label, Value: c.Value})
+		}
+	}
+	if len(v.Chips) == 0 {
+		pot := m.hand.PotTotal()
+		toCall := m.hand.ToCall(heroSeat)
+		if m.bar.State() != ActionBarWaiting && toCall > 0 {
+			v.Chips = append(v.Chips,
+				NumberChip{"to call", toCall.String()},
+				NumberChip{"pot odds", equity.PotOddsText(toCall, pot)},
+			)
+		} else if pot > 0 {
+			v.Chips = append(v.Chips,
+				NumberChip{"pot", pot.String() + " (" + m.hand.Blinds().BB(pot) + ")"},
+			)
+		}
+	}
+
+	// The grade of the hero's most recent action, shown while the villains
+	// respond. Feedback returns "" when the mode withholds it.
+	if g := m.lastGrade; g != nil {
+		if body := g.Feedback(m.coachMode.ProfileKey()); body != "" {
+			v.Grade = &GradeView{
+				Symbol: gradeSymbol(g.Grade),
+				Text:   body,
+				Good:   g.Grade.GoodOrBetter(),
+			}
+		}
 	}
 	return v
 }

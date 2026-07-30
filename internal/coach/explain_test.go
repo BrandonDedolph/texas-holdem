@@ -1,6 +1,7 @@
 package coach
 
 import (
+	"github.com/BrandonDedolph/texas-holdem/internal/profile"
 	"regexp"
 	"strconv"
 	"strings"
@@ -302,4 +303,65 @@ func sentenceCount(body string) int {
 		return 0
 	}
 	return strings.Count(body, ". ") + 1
+}
+
+// TestDrawNameCarriesItsTextbookCount guards the fact a learner memorizes.
+// The discounted total folds in pair outs and half-credits tainted ones, so
+// "your gutshot has about 8.5 outs" would teach a wrong canonical number for
+// the exact concept it just named.
+func TestDrawNameCarriesItsTextbookCount(t *testing.T) {
+	cases := []struct {
+		draw ai.DrawClass
+		outs int
+	}{
+		{ai.Gutshot, 4},
+		{ai.OESD, 8},
+		{ai.FlushDraw, 9},
+		{ai.ComboDraw, 15},
+	}
+	for _, tc := range cases {
+		got, ok := canonicalOuts(tc.draw)
+		if !ok {
+			t.Errorf("%v has no canonical count", tc.draw)
+			continue
+		}
+		if got != tc.outs {
+			t.Errorf("%v canonical outs = %d, want %d", tc.draw, got, tc.outs)
+		}
+	}
+	if _, ok := canonicalOuts(ai.NoDraw); ok {
+		t.Error("NoDraw should have no canonical count")
+	}
+}
+
+// TestOutsSentenceNeverMisattributes: whenever the body names a draw AND a
+// count, the count next to the draw's name must be that draw's textbook
+// figure, never the discounted total.
+func TestOutsSentenceNeverMisattributes(t *testing.T) {
+	c := New(profile.NewProfile(), 42)
+	spots := []*engine.PlayerView{
+		// Hero holds 9s8s in all three: a bare flush draw, an open-ender
+		// (7-8-9-10), and a gutshot (8-9-J-Q needs the ten).
+		heroView(t, flushDrawFacingBet(t, "As 7s 2h", "Kd Qc", 25, 3), 0),
+		heroView(t, flushDrawFacingBet(t, "7h Td 2c", "Kd Qc", 25, 8), 0),
+		heroView(t, flushDrawFacingBet(t, "Jh Qd 2c", "Kd 5c", 25, 4), 0),
+	}
+	for i, v := range spots {
+		body := c.Advise(v).Body
+		for draw, outs := range map[string]string{
+			"gutshot": "4", "open-ended straight draw": "8", "flush draw": "9",
+		} {
+			// "A <draw> is N outs" is the only form allowed to put a number
+			// immediately after a draw name.
+			bad := "Your " + draw + " has about "
+			if idx := strings.Index(body, bad); idx >= 0 {
+				rest := body[idx+len(bad):]
+				num := rest[:strings.IndexByte(rest, ' ')]
+				if num != outs {
+					t.Errorf("spot %d: body attributes %s outs to a %s (textbook %s): %q",
+						i, num, draw, outs, body)
+				}
+			}
+		}
+	}
 }

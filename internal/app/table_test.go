@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/BrandonDedolph/texas-holdem/internal/profile"
 	"strings"
 	"testing"
 
@@ -65,7 +66,7 @@ func buildTable(t *testing.T, sc tableScenario, w, h int) *TableScreen {
 		opps[s] = &scriptedOpponent{name: villainNames[s], script: sc.script[s]}
 	}
 
-	m := newTableScreen(cfg, nil, stacks, opps)
+	m := newTableScreen(cfg, nil, profile.NewProfile(), stacks, opps)
 	m.seed, m.seeded = sc.seed, true
 	m.Update(tea.WindowSizeMsg{Width: w, Height: h})
 	m.Init()
@@ -399,7 +400,7 @@ func TestTableResumeAfterNavigationRearms(t *testing.T) {
 	for s := engine.Seat(1); s.Valid(); s++ {
 		opps[s] = checkCallOpponent{name: villainNames[s]}
 	}
-	m := newTableScreen(cfg, nil, stacks, opps)
+	m := newTableScreen(cfg, nil, profile.NewProfile(), stacks, opps)
 	m.seed, m.seeded = 17, true
 	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	if cmd := m.Init(); cmd == nil {

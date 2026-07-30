@@ -8,9 +8,11 @@ import (
 
 	"github.com/BrandonDedolph/texas-holdem/internal/ai"
 	"github.com/BrandonDedolph/texas-holdem/internal/ai/rulebased"
+	"github.com/BrandonDedolph/texas-holdem/internal/coach"
 	"github.com/BrandonDedolph/texas-holdem/internal/engine"
 	"github.com/BrandonDedolph/texas-holdem/internal/equity"
 	"github.com/BrandonDedolph/texas-holdem/internal/eval"
+	"github.com/BrandonDedolph/texas-holdem/internal/profile"
 	"github.com/BrandonDedolph/texas-holdem/internal/ui/theme"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -30,6 +32,12 @@ const heroSeat engine.Seat = 0
 
 // heroName is how the hero is labelled everywhere.
 const heroName = "YOU"
+
+// coachSeed fixes the coach's mixed decisions. The coach must give the same
+// advice for the same spot every time — a learner who sees a recommendation
+// change on a re-deal of an identical situation learns that the advice is
+// arbitrary.
+const coachSeed int64 = 1
 
 // Opponent decides a villain's action from its PlayerView — the view that
 // physically cannot contain other seats' hole cards, which is what makes
@@ -123,6 +131,14 @@ type TableScreen struct {
 	coachMode CoachMode
 	speed     Speed
 
+	// The coach runs the same strategy the opponents do (DESIGN.md §1) — it
+	// is the TAG preset in the hero's seat. advice is frozen when the hero's
+	// turn begins; grades are frozen when they act and never revised.
+	coach     *coach.Coach
+	advice    *coach.Advice
+	lastGrade *coach.GradedDecision
+	grades    []coach.GradedDecision // this hand, in decision order
+
 	// seed drives deterministic decks (tests, replays); zero-value means a
 	// fresh crypto-shuffled deck per hand.
 	seed   uint64
@@ -156,7 +172,7 @@ type TableScreen struct {
 // NewTableScreen builds the session a GameSetup TableConfig describes:
 // hero at seat 0, the archetype lineup in seats 1..5, everyone at the
 // configured buy-in.
-func NewTableScreen(cfg TableConfig, prefs *Prefs) *TableScreen {
+func NewTableScreen(cfg TableConfig, prefs *Prefs, prof *profile.Profile) *TableScreen {
 	// Sanitize rather than panic: a hand-edited profile must never crash the
 	// table (engine.NewTable panics on nonsense blinds by design).
 	if cfg.SmallBlind <= 0 || cfg.BigBlind < cfg.SmallBlind {
@@ -180,14 +196,14 @@ func NewTableScreen(cfg TableConfig, prefs *Prefs) *TableScreen {
 		stacks[s] = cfg.Stack
 		opps[s] = newArchetypeOpponent(cfg.Lineup[i], villainNames[s], int64(s))
 	}
-	return newTableScreen(cfg, prefs, stacks, opps)
+	return newTableScreen(cfg, prefs, prof, stacks, opps)
 }
 
 // newTableScreen is the full-control constructor tests use: explicit
 // per-seat stacks (side-pot scenarios) and injectable opponents. Game state
 // is still reached only through the engine — this controls who sits down
 // with what, which is table configuration, not state poking.
-func newTableScreen(cfg TableConfig, prefs *Prefs, stacks [engine.MaxSeats]engine.Chips, opps [engine.MaxSeats]Opponent) *TableScreen {
+func newTableScreen(cfg TableConfig, prefs *Prefs, prof *profile.Profile, stacks [engine.MaxSeats]engine.Chips, opps [engine.MaxSeats]Opponent) *TableScreen {
 	eng := engine.NewTable(engine.TableConfig{
 		SmallBlind: cfg.SmallBlind,
 		BigBlind:   cfg.BigBlind,
@@ -203,6 +219,7 @@ func newTableScreen(cfg TableConfig, prefs *Prefs, stacks [engine.MaxSeats]engin
 		bar:       NewActionBar(),
 		coachMode: cfg.CoachMode,
 		speed:     cfg.Speed,
+		coach:     coach.New(prof, coachSeed),
 	}
 	if stacks[heroSeat] > 0 {
 		must(eng.Sit(heroSeat, heroName, stacks[heroSeat]))
@@ -564,6 +581,18 @@ func (m *TableScreen) armBar() {
 	}
 	m.bar.Arm(legal, pot, toCall, committed, m.cfg.BigBlind, info)
 	m.status = "Your turn " + theme.G.Dot + " " + m.choicesSummary()
+
+	// Advice is captured the moment the turn begins and frozen. The
+	// recommendation the hero saw is the one grading uses, which makes the
+	// audit trail airtight regardless of what a recompute would say.
+	//
+	// The previous decision's grade clears here: it belonged to the last
+	// action, and leaving it up would attach it to this one.
+	m.lastGrade = nil
+	if m.coach != nil {
+		adv := m.coach.Advise(m.hand.View(heroSeat))
+		m.advice = &adv
+	}
 }
 
 // choicesSummary spells the currently visible choices out for the status
@@ -822,6 +851,20 @@ func (m *TableScreen) heroAct(a engine.Action) tea.Cmd {
 	if m.hand == nil {
 		return nil
 	}
+	// Grade BEFORE applying. Apply can deal the next street, and a grade
+	// computed after that would have been informed by a card the hero did
+	// not have when they decided. This ordering is the mechanical guarantee
+	// behind "grade the decision, not the outcome" (DESIGN.md §1).
+	if m.coach != nil && m.advice != nil {
+		g := m.coach.GradeAction(*m.advice, a)
+		m.lastGrade = &g
+		m.grades = append(m.grades, g)
+	}
+	// The advice belonged to the decision just made. Holding it would leave
+	// a recommendation on screen through the villains' turns and past the
+	// showdown, reading as advice for a spot that no longer exists.
+	m.advice = nil
+
 	if err := m.hand.Apply(a); err != nil {
 		// LegalActions gating should make this unreachable; if the engine
 		// still objects, say so instead of desyncing.

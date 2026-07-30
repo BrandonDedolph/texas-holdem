@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/BrandonDedolph/texas-holdem/internal/profile"
 	"strings"
 	"testing"
 
@@ -33,7 +34,7 @@ func newLiveTable(t *testing.T, coach CoachMode) tea.Model {
 		SmallBlind: 5, BigBlind: 10, Stack: 1000,
 		Lineup: ClassroomLineup(), CoachMode: coach, Speed: SpeedInstant,
 	}
-	var m tea.Model = NewTableScreen(cfg, DefaultPrefs())
+	var m tea.Model = NewTableScreen(cfg, DefaultPrefs(), profile.NewProfile())
 	m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	m.Init()
 	return m
@@ -83,7 +84,7 @@ func TestEveryArchetypeSeatsAndPlays(t *testing.T) {
 				Lineup: []string{a.Key, a.Key, a.Key, a.Key, a.Key},
 				Speed:  SpeedInstant,
 			}
-			var m tea.Model = NewTableScreen(cfg, DefaultPrefs())
+			var m tea.Model = NewTableScreen(cfg, DefaultPrefs(), profile.NewProfile())
 			m, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 			m.Init()
 			for i := 0; i < 15; i++ {
