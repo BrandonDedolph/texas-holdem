@@ -117,13 +117,31 @@ type Trainer struct {
 	height int
 }
 
-// trainerResumeKind remembers the last quiz kind the player started, so a
-// rebuilt trainer screen puts the menu cursor back on it instead of
-// resetting to the top (docs/ui-review.md F3). In-memory only: the profile
-// has no field for it — a persisted `LastQuiz string` on profile.Profile
-// would make this survive restarts; until one exists, this covers model
-// rebuilds within a run. -1 means "never started a quiz".
-var trainerResumeKind = -1
+// resumeKind reads the quiz kind the player last started, so the trainer
+// opens on what they are actually practising rather than resetting to the
+// top. Persisted on the profile, so it survives a restart and not just a
+// model rebuild. Returns -1 when there is nothing to resume.
+func resumeKind(prof *profile.Profile) int {
+	if prof == nil || prof.LastQuiz == "" {
+		return -1
+	}
+	for k := trainer.QuizKind(0); k < trainer.NumQuizKinds; k++ {
+		if k.String() == prof.LastQuiz {
+			return int(k)
+		}
+	}
+	return -1
+}
+
+// rememberKind records the quiz the player just started. Best-effort save,
+// the same rationale as everywhere else: a broken disk must not stop a drill.
+func rememberKind(prof *profile.Profile, k trainer.QuizKind) {
+	if prof == nil {
+		return
+	}
+	prof.LastQuiz = k.String()
+	_ = prof.Save()
+}
 
 // NewTrainer builds the trainer on its quiz menu, with the cursor on the
 // last quiz kind practised (this run) rather than always on the first.
@@ -135,8 +153,8 @@ func NewTrainer(prof *profile.Profile, prefs *Prefs) *Trainer {
 		seed:   func() int64 { return time.Now().UnixNano() },
 	}
 	t.refreshMenu()
-	if trainerResumeKind >= 0 && trainerResumeKind < int(trainer.NumQuizKinds) {
-		t.list.cursor = trainerResumeKind
+	if k := resumeKind(prof); k >= 0 {
+		t.list.cursor = k
 	}
 	return t
 }
@@ -267,7 +285,7 @@ func (t *Trainer) menuAction(a KeyAction) (tea.Cmd, bool) {
 
 // begin starts a fresh session of a kind at the profile's current level.
 func (t *Trainer) begin(kind trainer.QuizKind) tea.Cmd {
-	trainerResumeKind = int(kind)
+	rememberKind(t.prof, kind)
 	t.session = trainer.NewSessionSeeded(kind, t.prof, t.seed())
 	t.state = trainerAsking
 	t.outcome = nil

@@ -322,11 +322,10 @@ func TestTrainerFlow(t *testing.T) {
 // TestTrainerMenuResumesLastQuiz: the quiz menu remembers the last quiz
 // practised — the cursor survives the end of a session and the rebuild of
 // the screen model — instead of resetting to the first row every time
-// (docs/ui-review.md F3). Cross-run persistence needs a profile field
-// (none exists yet); this pins the in-memory behaviour.
+// (docs/ui-review.md F3). The memory lives on the profile, so a rebuilt
+// screen must be given the same profile the app holds; a rebuild from a
+// fresh profile is a different player and correctly starts at the top.
 func TestTrainerMenuResumesLastQuiz(t *testing.T) {
-	trainerResumeKind = -1
-	t.Cleanup(func() { trainerResumeKind = -1 })
 
 	tr := testTrainerScreen(t, 80, 24)
 	if tr.list.Cursor() != 0 {
@@ -343,9 +342,10 @@ func TestTrainerMenuResumesLastQuiz(t *testing.T) {
 			got, int(trainer.QuizEquity))
 	}
 
-	// A rebuilt screen model (a later navigation constructs Trainer anew)
-	// starts on the same quiz.
-	fresh := testTrainerScreen(t, 80, 24)
+	// A rebuilt screen model (a later navigation constructs Trainer anew
+	// from the app's profile) starts on the same quiz.
+	fresh := NewTrainer(tr.prof, DefaultPrefs())
+	fresh.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	if got := fresh.list.Cursor(); got != int(trainer.QuizEquity) {
 		t.Errorf("rebuilt trainer cursor %d, want the last practised quiz %d",
 			got, int(trainer.QuizEquity))
@@ -375,5 +375,31 @@ func TestTrainerTimerTicks(t *testing.T) {
 	tr.endQuiz()
 	if _, cmd := tr.Update(trainerTickMsg{}); cmd != nil {
 		t.Error("clock must stop once the session ends")
+	}
+}
+
+// TestTrainerRemembersQuizAcrossRestarts: the trainer should open on what
+// the player is actually practising. An in-memory-only memory resets every
+// launch, which is exactly when it matters.
+func TestTrainerRemembersQuizAcrossRestarts(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	prof := profile.NewProfile()
+
+	tr := NewTrainer(prof, DefaultPrefs())
+	tr.begin(trainer.QuizOuts)
+	if prof.LastQuiz != trainer.QuizOuts.String() {
+		t.Fatalf("LastQuiz = %q, want %q", prof.LastQuiz, trainer.QuizOuts.String())
+	}
+
+	// A brand new screen from the same persisted profile resumes there.
+	again := NewTrainer(prof, DefaultPrefs())
+	if got := again.list.cursor; got != int(trainer.QuizOuts) {
+		t.Errorf("cursor = %d, want %d (the last quiz practised)", got, int(trainer.QuizOuts))
+	}
+
+	// An unknown value (hand-edited profile) must not crash or mis-select.
+	prof.LastQuiz = "no-such-quiz"
+	if got := NewTrainer(prof, DefaultPrefs()).list.cursor; got != 0 {
+		t.Errorf("unknown LastQuiz should fall back to the first quiz, got cursor %d", got)
 	}
 }

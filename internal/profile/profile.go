@@ -59,10 +59,15 @@ type Profile struct {
 	// internal/coach lands; profile stays decoupled until then.
 	GradeTotals map[string]int `json:"grade_totals"`
 
-	SessionLog    []SessionSummary `json:"session_log"`
-	CoachMode     string           `json:"coach_mode"` // CoachFull | CoachMistakes | CoachOff
-	TableDefaults TableConfig      `json:"table_defaults"`
-	Display       Display          `json:"display"`
+	SessionLog []SessionSummary `json:"session_log"`
+
+	// LastQuiz is the trainer quiz kind last started, so the trainer opens on
+	// what the player is actually practising instead of resetting to the top
+	// every run. Empty means "never started one".
+	LastQuiz      string      `json:"last_quiz"`
+	CoachMode     string      `json:"coach_mode"` // CoachFull | CoachMistakes | CoachOff
+	TableDefaults TableConfig `json:"table_defaults"`
+	Display       Display     `json:"display"`
 
 	// store is the Store that loaded this profile, so Save writes back to
 	// the same place. Unexported and JSON-invisible; nil means "resolve the
