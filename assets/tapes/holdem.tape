@@ -19,13 +19,22 @@ Set Framerate 24
 Set PlaybackSpeed 1.0
 
 Hide
+# A throwaway profile: menu cursor and status rows are derived from
+# saved progress, so recording against the real one would make the
+# output depend on how much the author had played that week.
+Type "export XDG_DATA_HOME=$(mktemp -d)"
+Enter
 Type "./bin/holdem"
 Enter
 Sleep 1s
 Show
 
-# Main menu, then "Play" (preselected).
+# Main menu. A fresh profile starts the cursor on Lessons (the app points a
+# new player at the curriculum first), so step up to Play explicitly rather
+# than assuming a row.
 Sleep 2s
+Up
+Sleep 800ms
 Enter
 
 # Game setup: "Start Game" is preselected.
