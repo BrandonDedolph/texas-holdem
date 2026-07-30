@@ -453,11 +453,12 @@ func (m *TableScreen) actionLabel(e engine.Event) string {
 	return ""
 }
 
-// pushRecent appends to the wide layout's action ticker.
+// pushRecent appends to the wide layout's action ticker, keeping exactly as
+// much history as the wide log region can show.
 func (m *TableScreen) pushRecent(s string) {
 	m.recent = append(m.recent, s)
-	if len(m.recent) > 4 {
-		m.recent = m.recent[len(m.recent)-4:]
+	if len(m.recent) > wideTickerRows {
+		m.recent = m.recent[len(m.recent)-wideTickerRows:]
 	}
 }
 

@@ -59,16 +59,35 @@ type CoachView struct {
 	// 60-col bar has no room for them, and the price is the one number a
 	// player must never lose (ui-review F6).
 	Price string
+
+	// Verdict is the finished hand's graded summary ("hand over · 1 Best,
+	// 1 Mistake (-1.2bb) · v review"). Empty while a hand is live and when
+	// the mode withholds it (Off always; Mistakes until a decision leaked).
+	Verdict string
+
+	// Session is the running session scoreboard: decision accuracy and net
+	// chips as SEPARATE labelled numbers, never blended into one score —
+	// watching them disagree is the variance lesson (DESIGN.md §1). Empty
+	// until the first hand of the sitting finishes.
+	Session []NumberChip
+
+	// BetweenHands marks the rest state. The strip surfaces the session
+	// scoreboard only then; the wide panel carries it permanently.
+	BetweenHands bool
 }
 
-// chipsText joins the number chips into one line: "pot odds 2.2:1 (31%) · to call 20".
-func (v CoachView) chipsText() string {
-	parts := make([]string, 0, len(v.Chips))
-	for _, c := range v.Chips {
+// joinChips joins labelled numbers into one dotted line:
+// "pot odds 2.2:1 (31%) · to call 20".
+func joinChips(chips []NumberChip) string {
+	parts := make([]string, 0, len(chips))
+	for _, c := range chips {
 		parts = append(parts, c.Label+" "+c.Value)
 	}
 	return strings.Join(parts, " "+theme.G.Dot+" ")
 }
+
+// chipsText joins the number chips into one line: "pot odds 2.2:1 (31%) · to call 20".
+func (v CoachView) chipsText() string { return joinChips(v.Chips) }
 
 // coachPanelWidth is the wide layout's side panel width (§2.6).
 const coachPanelWidth = 28
@@ -93,24 +112,46 @@ const coachIndent = "        "
 // is reserved even at CoachOff — it shows the neutral street summary then —
 // because toggling the coach must never reflow the table (§5.1).
 //
-// Verbosity contract (§5.4): Full shows opinion + reasoning; Mistakes shows
-// the numbers with no opinion (pot odds are the scoreboard, not coaching)
-// plus the grade only when the last decision missed; Off shows the neutral
-// summary only.
+// Verbosity contract (§5.4): Full shows opinion + reasoning; Mistakes says
+// NOTHING before the hero acts — its pre-decision numbers duplicated the
+// action bar's info cell verbatim, and once the strip is silent by default,
+// the coach speaking up is itself the signal that something went wrong
+// (ui-review §5 q5). Off shows the neutral summary only. Between hands every
+// mode may carry the session scoreboard row — accuracy beside net chips is
+// the player's own ledger, not coaching (DESIGN.md §1).
 func renderCoachStrip(v CoachView, mode CoachMode, neutral string, width int) string {
 	th := theme.Current
 	inner := width - len(coachIndent)
+
+	// The session scoreboard row, shown only at rest — during play the
+	// strip's rows belong to the current decision.
+	sessionRow := func() []string {
+		if !v.BetweenHands || len(v.Session) == 0 {
+			return nil
+		}
+		text := "session " + theme.G.Dot + " " + joinChips(v.Session)
+		return []string{" " + th.Help.Render(clip(text, width-1))}
+	}
 
 	var line1 string
 	rest := make([]string, 0, coachStripRows-1)
 	switch mode {
 	case CoachOff:
 		line1 = " " + th.Help.Render(clip(neutral, width-1))
+		rest = sessionRow()
 	case CoachMistakes:
-		line1 = " " + th.CoachTitle.Render("COACH") + "  " +
-			th.Body.Render(clip(v.chipsText(), inner))
-		if v.Grade != nil && !v.Grade.Good {
+		// Genuinely silent until the player errs. Grades keep recording in
+		// every mode (silence is a display choice, not an amnesty); the
+		// price stays on the action bar two rows down at this width.
+		switch {
+		case v.Grade != nil && !v.Grade.Good:
+			line1 = " " + th.CoachTitle.Render("COACH")
 			rest = gradeLines(*v.Grade, inner, coachStripRows-1)
+		case v.Verdict != "":
+			line1 = " " + th.Help.Render(clip(v.Verdict, width-1))
+			rest = sessionRow()
+		case v.BetweenHands:
+			rest = sessionRow()
 		}
 	default: // CoachFull
 		head := v.Headline
@@ -118,12 +159,19 @@ func renderCoachStrip(v CoachView, mode CoachMode, neutral string, width int) st
 			head = v.chipsText()
 		}
 		if head == "" {
-			// Nothing of our own to headline (between hands): show the
-			// neutral summary — which carries the hand verdict then — and
-			// keep any lingering grade on the reasoning rows.
-			line1 = " " + th.Help.Render(clip(neutral, width-1))
+			// Nothing of our own to headline: between hands the verdict
+			// takes the line and the session scoreboard the next; mid-hand
+			// the neutral summary holds it, with any lingering grade on the
+			// reasoning rows.
+			text := v.Verdict
+			if text == "" {
+				text = neutral
+			}
+			line1 = " " + th.Help.Render(clip(text, width-1))
 			if v.Grade != nil {
 				rest = gradeLines(*v.Grade, inner, coachStripRows-1)
+			} else {
+				rest = sessionRow()
 			}
 			break
 		}
@@ -215,7 +263,14 @@ func renderCoachLine(v CoachView, mode CoachMode, neutral string, width int) str
 		if v.Grade != nil && !v.Grade.Good {
 			return prefix + gradeText(*v.Grade, inner)
 		}
-		return prefix + th.Body.Render(clip(v.chipsText(), inner))
+		if v.Verdict != "" {
+			return " " + th.Help.Render(clip(v.Verdict, width-1))
+		}
+		// Silent until the player errs (ui-review §5 q5) — but at this
+		// width the compact line is the ONLY place the price appears, so
+		// the quiet form is the Off line: neutral summary plus the price,
+		// no opinion. The scoreboard survives every mode.
+		return renderCoachLine(v, CoachOff, neutral, width)
 	default: // CoachFull
 		if v.Grade != nil {
 			return prefix + gradeText(*v.Grade, inner)
@@ -230,6 +285,9 @@ func renderCoachLine(v CoachView, mode CoachMode, neutral string, width int) str
 			head = v.chipsText()
 		}
 		if head == "" {
+			if v.Verdict != "" {
+				return " " + th.Help.Render(clip(v.Verdict, width-1))
+			}
 			return renderCoachLine(v, CoachOff, neutral, width)
 		}
 		return prefix + th.Body.Render(clip(head, inner))
@@ -238,7 +296,11 @@ func renderCoachLine(v CoachView, mode CoachMode, neutral string, width int) str
 
 // renderCoachPanel renders the wide layout's bordered side panel: exactly
 // height rows, coachPanelWidth cells wide, with room for the recommendation,
-// reasoning, numbers and grade simultaneously (§2.6).
+// the WHOLE reasoning (the panel never truncates a body, so wide never needs
+// the e overlay), numbers and grade simultaneously (§2.6). The session
+// scoreboard — decision accuracy beside net chips, never blended — is pinned
+// to the panel's bottom rows in every mode: having the room is what the wide
+// layout is for (ui-review §5 q1/q3).
 func renderCoachPanel(v CoachView, mode CoachMode, neutral string, height int) string {
 	th := theme.Current
 	inner := coachPanelWidth - 4 // border + 1 cell padding each side
@@ -256,12 +318,12 @@ func renderCoachPanel(v CoachView, mode CoachMode, neutral string, height int) s
 	case CoachOff:
 		add(neutral, help)
 	case CoachMistakes:
-		for _, c := range v.Chips {
-			add(c.Label+"  "+c.Value, body)
-		}
+		// Silent until the player errs (ui-review §5 q5): no pre-decision
+		// numbers — at this width they sit in the action bar already.
 		if v.Grade != nil && !v.Grade.Good {
-			lines = append(lines, "")
 			add(v.Grade.Symbol+" "+v.Grade.Text, body)
+		} else if v.Verdict != "" {
+			add(v.Verdict, help)
 		}
 	default: // CoachFull
 		if v.Headline != "" {
@@ -281,8 +343,12 @@ func renderCoachPanel(v CoachView, mode CoachMode, neutral string, height int) s
 		}
 		if len(lines) == 0 {
 			// Nothing of the coach's own to show (between hands): the
-			// neutral line carries the hand verdict then, same as the strip.
-			add(neutral, help)
+			// verdict takes the slot, same as the strip.
+			if v.Verdict != "" {
+				add(v.Verdict, help)
+			} else {
+				add(neutral, help)
+			}
 		}
 	}
 
@@ -293,6 +359,17 @@ func renderCoachPanel(v CoachView, mode CoachMode, neutral string, height int) s
 	if interior < 1 {
 		interior = 1
 	}
+
+	// The session block claims the bottom rows when it exists and fits;
+	// everything above keeps its position, so the block appearing after the
+	// first hand never moves the coach's own lines.
+	if sess := sessionPanelLines(v.Session, inner); sess != nil && len(all)+len(sess) <= interior {
+		for len(all) < interior-len(sess) {
+			all = append(all, "")
+		}
+		all = append(all, sess...)
+	}
+
 	for len(all) < interior {
 		all = append(all, "")
 	}
@@ -301,6 +378,26 @@ func renderCoachPanel(v CoachView, mode CoachMode, neutral string, height int) s
 		all[i] = padStyledTo(l, inner)
 	}
 	return th.CoachBox.Render(strings.Join(all, "\n"))
+}
+
+// sessionPanelLines renders the session scoreboard for the wide panel: a
+// rule, the title, and one labelled line per figure — accuracy and net chips
+// stay separate lines so they can visibly disagree (DESIGN.md §1).
+func sessionPanelLines(session []NumberChip, inner int) []string {
+	if len(session) == 0 {
+		return nil
+	}
+	th := theme.Current
+	out := []string{
+		th.Rule.Render(strings.Repeat(theme.G.RuleH, inner)),
+		th.CoachTitle.Render("SESSION"),
+	}
+	for _, c := range session {
+		for _, l := range wrapPlain(c.Label+" "+c.Value, inner) {
+			out = append(out, th.Body.Render(l))
+		}
+	}
+	return out
 }
 
 // gradeText renders a grade in its good/bad style, truncated to fit.
