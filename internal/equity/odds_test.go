@@ -57,3 +57,32 @@ func TestRequiredEquityText(t *testing.T) {
 }
 
 func chips(n int64) engine.Chips { return engine.Chips(n) }
+
+func TestOddsToOneMatchesTheDesignMockups(t *testing.T) {
+	// docs/design-tui.md mockup A: hero faces a raise to 30 with 45 in the pot
+	// and 20 to call. The doc originally mis-stated this as 3.2:1 (24%); the
+	// arithmetic is 45/20 = 2.25 and 20/65 = 30.8%.
+	if got, want := OddsToOne(20, 45), "2.2:1"; got != want {
+		t.Errorf("OddsToOne(20, 45) = %q, want %q", got, want)
+	}
+	if got, want := PotOddsText(20, 45), "2.2:1 (31%)"; got != want {
+		t.Errorf("PotOddsText(20, 45) = %q, want %q", got, want)
+	}
+	// Mockup B: hero bets 120 into 185, villain calls 120 into 305.
+	if got, want := PotOddsText(120, 305), "2.5:1 (28%)"; got != want {
+		t.Errorf("PotOddsText(120, 305) = %q, want %q", got, want)
+	}
+	// Mockup C: 640 to call into 1,610.
+	if got, want := OddsToOne(640, 1610), "2.5:1"; got != want {
+		t.Errorf("OddsToOne(640, 1610) = %q, want %q", got, want)
+	}
+}
+
+func TestOddsToOneWithNothingToCall(t *testing.T) {
+	if got := OddsToOne(0, 100); got != "—" {
+		t.Errorf("OddsToOne(0, 100) = %q, want an em dash", got)
+	}
+	if got := PotOddsText(0, 100); got != "no bet to call" {
+		t.Errorf("PotOddsText(0, 100) = %q", got)
+	}
+}

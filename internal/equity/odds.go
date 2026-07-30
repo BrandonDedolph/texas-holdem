@@ -43,6 +43,33 @@ func OddsRatio(toCall, pot engine.Chips) (int, int) {
 	return int(int64(pot) / a), int(int64(toCall) / a)
 }
 
+// OddsToOne renders the ratio normalized to one, the form the coach and the
+// action bar quote: "2.2:1". OddsRatio's reduced-integer form is exact but can
+// read awkwardly at the table (20 into 45 reduces to 9:4), and a learner
+// comparing prices across spots needs directly comparable numbers. One decimal
+// place, because a third significant figure is false precision for a decision
+// that only has to clear a threshold.
+func OddsToOne(toCall, pot engine.Chips) string {
+	if toCall <= 0 {
+		return "—"
+	}
+	if pot < 0 {
+		pot = 0
+	}
+	return fmt.Sprintf("%.1f:1", float64(pot)/float64(toCall))
+}
+
+// PotOddsText is the pair the UI shows together: the ratio a player says out
+// loud, and the percentage they actually compare their equity against —
+// "2.2:1 (31%)".
+func PotOddsText(toCall, pot engine.Chips) string {
+	if toCall <= 0 {
+		return "no bet to call"
+	}
+	pct := int(PotOdds(toCall, pot)*100 + 0.5)
+	return fmt.Sprintf("%s (%d%%)", OddsToOne(toCall, pot), pct)
+}
+
 // RequiredEquityText renders the pot-odds lesson sentence the coach and the
 // tutorial quote verbatim: "risk 50 to win 150 → need 25%".
 func RequiredEquityText(toCall, pot engine.Chips) string {
