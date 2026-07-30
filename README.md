@@ -2,15 +2,27 @@
 
 ![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)
 ![License](https://img.shields.io/badge/License-MIT-blue)
-![Status](https://img.shields.io/badge/Status-in%20design-orange)
+![Status](https://img.shields.io/badge/Status-in%20progress-yellow)
 
 A terminal Texas Hold'em game built to **teach you the game**, not just simulate
 it — 6-max No-Limit cash game against AI opponents, with a live coach, guided
 lessons, an equity trainer, and post-hand review. Built with
 [Bubble Tea](https://github.com/charmbracelet/bubbletea).
 
-> **Status: design complete, implementation starting.** The full design lives in
+> **Status: under construction — not yet playable.** The full design lives in
 > [`docs/`](docs/) — start with [`docs/DESIGN.md`](docs/DESIGN.md).
+>
+> | Package | State |
+> |---|---|
+> | `internal/engine` — betting, side pots, table lifecycle | ✅ done |
+> | `internal/eval` — 7-card evaluator (32 ns/op, 0 allocs) | ✅ done |
+> | `internal/ui` — theme, cards, seats, pot line | ✅ done |
+> | `internal/profile` — persistence | ✅ done |
+> | `internal/equity` — ranges, enumeration, outs | 🔨 in progress |
+> | `internal/app` — screens and navigation | 🔨 in progress |
+> | `internal/ai` — opponents and archetypes | ⬜ next |
+> | `internal/coach` — advice and grading | ⬜ next |
+> | `internal/tutorial`, `trainer`, `review` | ⬜ planned |
 
 ## The idea
 
