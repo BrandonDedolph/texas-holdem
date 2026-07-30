@@ -9,6 +9,7 @@ import (
 	"github.com/BrandonDedolph/texas-holdem/internal/engine"
 	"github.com/BrandonDedolph/texas-holdem/internal/equity"
 	"github.com/BrandonDedolph/texas-holdem/internal/eval"
+	"github.com/BrandonDedolph/texas-holdem/internal/ui/theme"
 )
 
 // sampleVisuals covers every visual type once.
@@ -37,6 +38,24 @@ func sampleVisuals(t *testing.T) map[string]*Visual {
 				Notes: map[engine.Position]string{
 					engine.PosUTG: "first to act preflop",
 					engine.PosBTN: "best seat",
+				},
+			},
+		},
+		"showdown": {
+			Showdown: &VisualShowdown{
+				Board: engine.MustCards("Qs Jh 7d 4c 2h"),
+				Hands: []ShownHand{
+					{Label: "Player A", Hole: engine.Holes("Ac Kd")},
+					{Label: "Player B", Hole: engine.Holes("7h 8h")},
+				},
+			},
+			Caption: "a labelled head-to-head",
+		},
+		"showdown-preflop": {
+			Showdown: &VisualShowdown{
+				Hands: []ShownHand{
+					{Label: "You", Hole: engine.Holes("Kh Jc")},
+					{Label: "The raiser", Hole: engine.Holes("Ad Qs")},
 				},
 			},
 		},
@@ -70,6 +89,96 @@ func TestVisualsRenderWithin80Cols(t *testing.T) {
 func TestEmptyVisualRendersNothing(t *testing.T) {
 	if out := (&Visual{}).Render(80); out != "" {
 		t.Errorf("empty visual rendered %q", out)
+	}
+}
+
+// TestShowdownLabelsEveryHand: the head-to-head visual names whose cards
+// are whose — an unlabelled comparison teaches nothing — and does so in
+// both the full and the compact form.
+func TestShowdownLabelsEveryHand(t *testing.T) {
+	vis := sampleVisuals(t)["showdown"]
+	for name, out := range map[string]string{
+		"full":    vis.Render(80),
+		"compact": vis.RenderCompact(60),
+	} {
+		for _, label := range []string{"Player A", "Player B"} {
+			if !strings.Contains(out, label) {
+				t.Errorf("%s: showdown missing label %q:\n%s", name, label, out)
+			}
+		}
+	}
+	// A preflop matchup (no board) still renders both labelled hands.
+	pre := sampleVisuals(t)["showdown-preflop"]
+	out := pre.Render(80)
+	if !strings.Contains(out, "You") || !strings.Contains(out, "The raiser") {
+		t.Errorf("preflop showdown missing labels:\n%s", out)
+	}
+	if strings.Contains(out, "Board") {
+		t.Errorf("preflop showdown should not draw a board:\n%s", out)
+	}
+}
+
+// TestFullCardGeometry pins the study card's 7x5 box: exact dimensions for
+// both rank widths, the rank in the top-left and bottom-right indices, and
+// the same footprint highlighted or not — a highlight that changed the size
+// would shift every layout that uses it.
+func TestFullCardGeometry(t *testing.T) {
+	for _, code := range []string{"As", "10d"} {
+		card := engine.MustCards(code)[0]
+		for _, highlight := range []bool{false, true} {
+			out := FullCard(card, highlight)
+			lines := strings.Split(out, "\n")
+			if len(lines) != FullCardHeight {
+				t.Fatalf("%s highlight=%v: %d rows, want %d", code, highlight, len(lines), FullCardHeight)
+			}
+			for i, l := range lines {
+				if w := lipgloss.Width(l); w != FullCardWidth {
+					t.Errorf("%s highlight=%v row %d: %d cells, want %d", code, highlight, i, w, FullCardWidth)
+				}
+			}
+		}
+		plain := stripANSI(FullCard(card, false))
+		rank := card.Rank().Symbol()
+		rows := strings.Split(plain, "\n")
+		if !strings.HasPrefix(rows[1], theme.G.CardVL+rank) {
+			t.Errorf("%s: top-left index missing, row %q", code, rows[1])
+		}
+		if !strings.HasSuffix(rows[3], rank+theme.G.CardVR) {
+			t.Errorf("%s: bottom-right index missing, row %q", code, rows[3])
+		}
+	}
+}
+
+// TestColorizeCards: card codes render through the inline card (suit glyph,
+// same cell width), range-spec combos split into their two cards, and
+// hand-class notation is left alone.
+func TestColorizeCards(t *testing.T) {
+	base := theme.Current.Body
+	spade := theme.G.SuitSpade
+	club := theme.G.SuitClub
+
+	out := stripANSI(ColorizeCards("the As completes it", base))
+	if want := "the A" + spade + " completes it"; out != want {
+		t.Errorf("As: got %q, want %q", out, want)
+	}
+	if got := stripANSI(ColorizeCards("holding 10c here", base)); got != "holding 10"+club+" here" {
+		t.Errorf("10c: got %q", got)
+	}
+	// A range-spec combo is two concatenated cards.
+	if got := stripANSI(ColorizeCards("range: 9c8c only", base)); got != "range: 9"+club+"8"+club+" only" {
+		t.Errorf("combo: got %q", got)
+	}
+	// Hand-class notation must not be mistaken for cards.
+	for _, s := range []string{"open A5s here", "fold K9s+ and 108s+", "72o never plays"} {
+		if got := stripANSI(ColorizeCards(s, base)); got != s {
+			t.Errorf("notation %q changed to %q", s, got)
+		}
+	}
+	// Width is preserved: wrapping computed on the plain text stays valid.
+	for _, s := range []string{"As Kd 10h", "the 4c completes his flush"} {
+		if got, want := lipgloss.Width(ColorizeCards(s, base)), lipgloss.Width(s); got != want {
+			t.Errorf("%q: colorized width %d, plain %d", s, got, want)
+		}
 	}
 }
 

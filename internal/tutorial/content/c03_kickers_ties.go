@@ -44,8 +44,16 @@ func init() {
 			{
 				Kind: tutorial.SectionDrill,
 				Drill: &tutorial.Drill{
-					Prompt: "Board: Ah 9d 6c 3s 2d. Player A holds Ac Kd. Player B holds " +
-						"As Qh. Who wins?",
+					Prompt: "Both players pair the ace. Who wins?",
+					Visual: &tutorial.Visual{
+						Showdown: &tutorial.VisualShowdown{
+							Board: engine.MustCards("Ah 9d 6c 3s 2d"),
+							Hands: []tutorial.ShownHand{
+								{Label: "Player A", Hole: engine.Holes("Ac Kd")},
+								{Label: "Player B", Hole: engine.Holes("As Qh")},
+							},
+						},
+					},
 					Answer: tutorial.ChoiceAnswer{
 						Choices: []string{"Player A", "Player B", "Split pot"},
 						Correct: 0,
@@ -77,8 +85,16 @@ func init() {
 			{
 				Kind: tutorial.SectionDrill,
 				Drill: &tutorial.Drill{
-					Prompt: "Board: 7c 8d 9h 10c Js — a jack-high straight on the board. " +
-						"Player A holds Ad 2c. Player B holds Kh 3d. Who wins?",
+					Prompt: "The board itself is a jack-high straight. Who wins?",
+					Visual: &tutorial.Visual{
+						Showdown: &tutorial.VisualShowdown{
+							Board: engine.MustCards("7c 8d 9h 10c Js"),
+							Hands: []tutorial.ShownHand{
+								{Label: "Player A", Hole: engine.Holes("Ad 2c")},
+								{Label: "Player B", Hole: engine.Holes("Kh 3d")},
+							},
+						},
+					},
 					Answer: tutorial.ChoiceAnswer{
 						Choices: []string{"Player A", "Player B", "Split pot"},
 						Correct: 2,

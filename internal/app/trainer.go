@@ -416,12 +416,21 @@ func (t *Trainer) currentItem() *trainer.Item {
 // Row budgets for the question panel. Every region renders at exactly its
 // budget (padded or cropped) so answering, feedback, and item changes can
 // never move an anchor — the table screen's layout discipline applied here.
+//
+// Full/wide arithmetic: the study region (a 5-row board, a label row and a
+// 5-row hand row, plus the "Board" caption) needs 12 rows, and 12 + 3 + 4
+// = 19 fits the 20-row content budget at 80x24. There is no room left for
+// a separate feedback region, so — exactly like the lesson drills — the
+// visual yields its rows to the verdict and explanation once answered; the
+// next question brings the cards straight back. The compact floor (60x20,
+// 16 content rows) cannot afford 5-row cards at all and keeps the two
+// inline card lines plus a separate feedback region: 2+3+4+5 = 14.
 const (
-	trainerVisualRows   = 8 // full/wide: the tutorial visual (board + hole)
-	trainerCompactRows  = 2 // compact: inline card lines instead
+	trainerStudyRows    = 12 // full/wide: the drawn cards, or the feedback
+	trainerCompactRows  = 2  // compact: inline card lines instead
 	trainerPromptRows   = 3
 	trainerAnswerRows   = 4
-	trainerFeedbackRows = 5
+	trainerFeedbackRows = 5 // compact only; full/wide feedback uses the study region
 )
 
 // View implements tea.Model.
@@ -573,7 +582,8 @@ func trainerUnlockLine(prof *profile.Profile, kind trainer.QuizKind) string {
 	}
 }
 
-// renderQuestion draws the item at its fixed row budgets.
+// renderQuestion draws the item at its fixed row budgets (see the budget
+// arithmetic above the constants).
 func (t *Trainer) renderQuestion(qw int, compact bool) string {
 	it := t.currentItem()
 	if it == nil {
@@ -582,16 +592,20 @@ func (t *Trainer) renderQuestion(qw int, compact bool) string {
 	var parts []string
 	if compact {
 		parts = append(parts, padHeight(t.renderInlineCards(it, qw), trainerCompactRows))
-	} else {
-		visual := ""
-		if it.Drill.Visual != nil {
-			visual = it.Drill.Visual.Render(qw)
-		}
-		parts = append(parts, padHeight(visual, trainerVisualRows))
+		parts = append(parts, padHeight(t.renderPrompt(it, qw), trainerPromptRows))
+		parts = append(parts, padHeight(t.renderAnswers(it, qw), trainerAnswerRows))
+		parts = append(parts, padHeight(t.renderFeedback(qw), trainerFeedbackRows))
+		return padBlock(strings.Join(parts, "\n"), qw)
 	}
+	study := ""
+	if t.state == trainerFeedback {
+		study = t.renderFeedback(qw)
+	} else if it.Drill.Visual != nil {
+		study = it.Drill.Visual.Render(qw)
+	}
+	parts = append(parts, padHeight(study, trainerStudyRows))
 	parts = append(parts, padHeight(t.renderPrompt(it, qw), trainerPromptRows))
 	parts = append(parts, padHeight(t.renderAnswers(it, qw), trainerAnswerRows))
-	parts = append(parts, padHeight(t.renderFeedback(qw), trainerFeedbackRows))
 	return padBlock(strings.Join(parts, "\n"), qw)
 }
 
@@ -609,22 +623,35 @@ func padBlock(s string, width int) string {
 }
 
 // renderInlineCards is the compact substitute for the tutorial visual: the
-// board and hole cards on two inline rows.
+// board and the hands on two inline rows.
 func (t *Trainer) renderInlineCards(it *trainer.Item, qw int) string {
 	th := theme.Current
 	v := it.Drill.Visual
-	if v == nil || v.Board == nil {
+	switch {
+	case v == nil:
 		return ""
+	case v.Showdown != nil:
+		var lines []string
+		if len(v.Showdown.Board) > 0 {
+			lines = append(lines, padRow2(th.Body.Render("Board: "), trainerInline(v.Showdown.Board), qw))
+		}
+		hands := make([]string, len(v.Showdown.Hands))
+		for i, hd := range v.Showdown.Hands {
+			hands[i] = th.Body.Render(hd.Label+" ") + trainerInline(hd.Hole[:])
+		}
+		return strings.Join(append(lines, padRow2("", strings.Join(hands, "   "), qw)), "\n")
+	case v.Board != nil:
+		board := th.BoardPlaceholder.Render("(no board)")
+		if len(v.Board.Board) > 0 {
+			board = trainerInline(v.Board.Board)
+		}
+		lines := []string{padRow2(th.Body.Render("Board: "), board, qw)}
+		if v.Board.ShowHole {
+			lines = append(lines, padRow2(th.Body.Render("You:   "), trainerInline(v.Board.Hole[:]), qw))
+		}
+		return strings.Join(lines, "\n")
 	}
-	board := th.BoardPlaceholder.Render("(no board)")
-	if len(v.Board.Board) > 0 {
-		board = trainerInline(v.Board.Board)
-	}
-	lines := []string{padRow2(th.Body.Render("Board: "), board, qw)}
-	if v.Board.ShowHole {
-		lines = append(lines, padRow2(th.Body.Render("You:   "), trainerInline(v.Board.Hole[:]), qw))
-	}
-	return strings.Join(lines, "\n")
+	return ""
 }
 
 // padRow2 joins a label and styled cards, padding the plain remainder so
@@ -649,12 +676,15 @@ func trainerInline(cards []engine.Card) string {
 
 // renderPrompt wraps each logical prompt line to the panel width; the
 // caller crops the result to the prompt's row budget, so an overlong
-// question loses its tail rather than reflowing the panel.
+// question loses its tail rather than reflowing the panel. Card codes that
+// legitimately stay in prose (a level-3 range spec) render as cards.
 func (t *Trainer) renderPrompt(it *trainer.Item, qw int) string {
 	th := theme.Current
-	lines := strings.Split(it.Drill.Prompt, "\n")
-	for i, l := range lines {
-		lines[i] = th.Body.Width(qw).Render(l)
+	var lines []string
+	for _, logical := range strings.Split(it.Drill.Prompt, "\n") {
+		for _, l := range wrapPlain(logical, qw) {
+			lines = append(lines, tutorial.ColorizeCards(l, th.Body))
+		}
 	}
 	return strings.Join(lines, "\n")
 }
@@ -720,7 +750,15 @@ func (t *Trainer) renderFeedback(qw int) string {
 	if out.Detail != "" {
 		body = out.Detail + "\n" + body
 	}
-	return verdict + "\n" + th.Body.Width(qw).Render(body)
+	lines := []string{verdict}
+	for _, logical := range strings.Split(body, "\n") {
+		// Explanations list out cards ("Clean outs (9): 2s 4s ..."); they
+		// render as cards, matching the board they refer to.
+		for _, l := range wrapPlain(logical, qw) {
+			lines = append(lines, tutorial.ColorizeCards(l, th.Body))
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // viewSummary closes the session in the shared chrome. The last line is

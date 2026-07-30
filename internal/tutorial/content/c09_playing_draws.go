@@ -33,8 +33,14 @@ func init() {
 			{
 				Kind: tutorial.SectionDrill,
 				Drill: &tutorial.Drill{
-					Prompt: "You hold 9h 8h on 10h 7c 2d — open-ended. How many clean " +
-						"outs? (exact)",
+					Prompt: "Open-ended on the flop. How many clean outs? (exact)",
+					Visual: &tutorial.Visual{
+						Board: &tutorial.VisualBoard{
+							Board:    engine.MustCards("10h 7c 2d"),
+							Hole:     engine.Holes("9h 8h"),
+							ShowHole: true,
+						},
+					},
 					Answer: tutorial.NumericAnswer{Value: 8},
 					Explain: "Eight: four jacks and four sixes complete the straight. " +
 						"Pairing your 9 or 8 is NOT counted — a middle pair doesn't beat " +

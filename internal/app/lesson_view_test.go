@@ -1,6 +1,7 @@
 package app
 
 import (
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -416,11 +417,94 @@ func TestScriptViewLayoutStable(t *testing.T) {
 	}
 }
 
+// bareCardCode matches a card code standing alone in rendered output —
+// the exact reading burden the drawn cards exist to remove. The legacy "T"
+// rank is included so a regression to "Td" is caught too.
+var bareCardCode = regexp.MustCompile(`\b(?:10|[2-9AKQJT])[cdhs]\b`)
+
+// TestDrillsRenderCardsNotCodes: a drill about cards shows drawn cards.
+// Every drill section of every lesson renders — question and answered
+// states — with no bare card code anywhere in the frame: cards the drill
+// asks about live in its Visual, and codes that legitimately remain in
+// prose (explanations, order items) are colorized through the inline card,
+// whose suit glyph is not a code letter.
+func TestDrillsRenderCardsNotCodes(t *testing.T) {
+	for _, lesson := range tutorial.All() {
+		l, _ := openLessonScreen(t, lesson.ID, 80, 24)
+		v := l.view
+		for i := range lesson.Sections {
+			sec := &lesson.Sections[i]
+			if sec.Drill == nil {
+				continue
+			}
+			v.enterSection(i)
+			if m := bareCardCode.FindString(stripANSI(l.View())); m != "" {
+				t.Errorf("%s section %d: question shows bare card code %q", lesson.ID, i+1, m)
+			}
+			v.drill.typed = typedFor(sec.Drill)
+			v.handleAction(ActSelect)
+			if m := bareCardCode.FindString(stripANSI(l.View())); m != "" {
+				t.Errorf("%s section %d: explanation shows bare card code %q", lesson.ID, i+1, m)
+			}
+		}
+	}
+}
+
+// TestDrillSectionsFitTheirBudget: a drill has no scroll interaction (the
+// arrow keys move the choice cursor), so its whole body — prompt, visual,
+// input, and the answered state's explanation — must fit the h-4 content
+// budget at every breakpoint. The full-size study card pays for itself
+// here: 1 prompt + 1 blank + 12 visual + 1 blank + 3 choices = 18 of the
+// 20 rows at 80x24, and the compact breakpoint drops to 3-row mini cards
+// (8 visual rows, 14 total of 16) to keep fitting.
+func TestDrillSectionsFitTheirBudget(t *testing.T) {
+	prof := profile.NewProfile()
+	for _, l := range tutorial.All() {
+		prof.CompleteLesson(l.ID)
+	}
+	for _, size := range []struct{ w, h int }{{80, 24}, {104, 30}, {60, 20}} {
+		budget := size.h - 4
+		compact := layoutFor(size.w, size.h) == LayoutCompact
+		for _, lesson := range tutorial.All() {
+			v := newLessonView(lesson, prof)
+			for i := range lesson.Sections {
+				if lesson.Sections[i].Drill == nil {
+					continue
+				}
+				v.enterSection(i)
+				states := map[string]func() []string{
+					"question": func() []string { return v.renderDrill(size.w, compact) },
+					"answered": func() []string {
+						v.drill.answered, v.drill.answer = true, "1"
+						defer func() { v.drill = drillState{} }()
+						return v.renderDrill(size.w, compact)
+					},
+				}
+				for state, render := range states {
+					body := render()
+					if len(body) > budget {
+						t.Errorf("%dx%d %s section %d (%s): %d rows exceed the %d-row budget",
+							size.w, size.h, lesson.ID, i+1, state, len(body), budget)
+					}
+					for n, line := range body {
+						if w := lipgloss.Width(line); w > size.w {
+							t.Errorf("%dx%d %s section %d (%s): line %d is %d cells wide",
+								size.w, size.h, lesson.ID, i+1, state, n, w)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 // TestLessonViewLinesFitCompact: every section of the visual-heavy lessons
 // renders inside 60 columns at the compact breakpoint — an overflowing line
 // would wrap and break every anchor below it.
 func TestLessonViewLinesFitCompact(t *testing.T) {
-	for _, id := range []string{"hand-rankings", "preflop-ranges", "pot-odds"} {
+	for _, id := range []string{"hand-rankings", "kickers-ties", "facing-raises",
+		"preflop-ranges", "pot-odds", "outs-equity", "playing-draws",
+		"why-we-bet", "bet-sizing"} {
 		l, _ := openLessonScreen(t, id, 60, 20)
 		v := l.view
 		for i := range v.lesson.Sections {

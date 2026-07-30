@@ -48,8 +48,15 @@ func init() {
 			{
 				Kind: tutorial.SectionDrill,
 				Drill: &tutorial.Drill{
-					Prompt: "You raised with Ad Kd and the flop is Ah 7c 2d. You bet " +
-						"and get called by a worse ace. Your bet was...",
+					Prompt: "You raised preflop, bet this flop, and get called by a " +
+						"worse ace. Your bet was...",
+					Visual: &tutorial.Visual{
+						Board: &tutorial.VisualBoard{
+							Board:    engine.MustCards("Ah 7c 2d"),
+							Hole:     engine.Holes("Ad Kd"),
+							ShowHole: true,
+						},
+					},
 					Answer: tutorial.ChoiceAnswer{
 						Choices: []string{
 							"A value bet — worse hands called",
@@ -68,9 +75,16 @@ func init() {
 			{
 				Kind: tutorial.SectionDrill,
 				Drill: &tutorial.Drill{
-					Prompt: "You raised with Ac 5c and the flop comes Jh 10h 9s — low- " +
-						"and-middle straight-and-flush city, and it smashed your " +
-						"opponent's calling range. Best default?",
+					Prompt: "You raised preflop and this flop comes down — straight-" +
+						"and-flush city, and it smashed your opponent's calling range. " +
+						"Best default?",
+					Visual: &tutorial.Visual{
+						Board: &tutorial.VisualBoard{
+							Board:    engine.MustCards("Jh 10h 9s"),
+							Hole:     engine.Holes("Ac 5c"),
+							ShowHole: true,
+						},
+					},
 					Answer: tutorial.ChoiceAnswer{
 						Choices: []string{
 							"C-bet anyway — you were the raiser",

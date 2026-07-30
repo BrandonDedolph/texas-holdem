@@ -37,7 +37,7 @@ func genOuts(rng *rand.Rand, tag string) Item {
 		}
 		return outsItem(tag, shape.hero, shape.board, report,
 			villainShown(shape.villain, shape.board),
-			engine.CardsString(shape.villain[:]), false)
+			engine.CardsString(shape.villain[:]), false, &shape.villain)
 	}
 	panic("trainer: outs generation exhausted attempts for " + tag)
 }
@@ -241,19 +241,21 @@ func genOutsTainted(rng *rand.Rand) (Item, bool) {
 	}
 	prompt := "Villain's range: " + spec + ". Count only your clean outs."
 	return outsItem(tagOutsTainted, hero, board, report, prompt,
-		spec, true), true
+		spec, true, nil), true
 }
 
-// outsItem packages a verified outs question.
+// outsItem packages a verified outs question. A known villain holding is
+// drawn as cards beside the hero's (shown non-nil); a range-based villain
+// stays in the prompt as its spec, and the visual shows just the hero's
+// draw.
 func outsItem(tag string, hero [2]engine.Card, board []engine.Card,
-	report equity.OutsReport, prompt, villain string, isRange bool) Item {
+	report equity.OutsReport, prompt, villain string, isRange bool,
+	shown *[2]engine.Card) Item {
 
 	return Item{
 		Drill: tutorial.Drill{
-			Prompt: prompt,
-			Visual: &tutorial.Visual{Board: &tutorial.VisualBoard{
-				Board: board, Hole: hero, ShowHole: true,
-			}},
+			Prompt:  prompt,
+			Visual:  drawVisual(hero, board, shown),
 			Answer:  tutorial.NumericAnswer{Value: float64(report.Count), Tolerance: 0},
 			Explain: outsExplain(report, len(board)),
 		},
@@ -265,11 +267,30 @@ func outsItem(tag string, hero [2]engine.Card, board []engine.Card,
 	}
 }
 
-// villainShown phrases a stated exact holding, with its made hand named by
-// the evaluator so the description can never misfile the hand.
+// drawVisual is the shared outs/equity picture: the hero's cards against a
+// shown villain holding when there is one, otherwise the hero's draw alone.
+// Cards live here, in the drawing, never as codes in the prompt.
+func drawVisual(hero [2]engine.Card, board []engine.Card, shown *[2]engine.Card) *tutorial.Visual {
+	if shown != nil {
+		return &tutorial.Visual{Showdown: &tutorial.VisualShowdown{
+			Board: board,
+			Hands: []tutorial.ShownHand{
+				{Label: "You", Hole: hero},
+				{Label: "Villain", Hole: *shown},
+			},
+		}}
+	}
+	return &tutorial.Visual{Board: &tutorial.VisualBoard{
+		Board: board, Hole: hero, ShowHole: true,
+	}}
+}
+
+// villainShown phrases a stated exact holding — the cards themselves are in
+// the visual, so the prompt names only the made hand, by the evaluator, so
+// the description can never misfile it.
 func villainShown(villain [2]engine.Card, board []engine.Card) string {
-	return "Villain shows " + engine.CardsString(villain[:]) + " (" +
-		eval.EvalHoldem(villain, board).Describe() + "). How many clean outs do you have?"
+	return "Villain shows " + eval.EvalHoldem(villain, board).Describe() +
+		". How many clean outs do you have?"
 }
 
 // outsExplain renders the answer from the report and nothing else: the out

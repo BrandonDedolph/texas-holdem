@@ -291,6 +291,54 @@ func TestTrainerQuizFitsCompact(t *testing.T) {
 	}
 }
 
+// TestTrainerQuizRendersCardsNotCodes: the trainer is the mode built to
+// drill card reading, so its cards must be pictures. Full sessions of every
+// quiz kind, at every breakpoint and at the lowest and highest level (the
+// level-3 items are the ones that quote range specs), render every frame —
+// question and feedback — with no bare card code, at exactly the terminal
+// height, with no line overflowing the width, and with the two-hand
+// comparison's Left/Right labels on screen while a rankings question asks.
+func TestTrainerQuizRendersCardsNotCodes(t *testing.T) {
+	kinds := []trainer.QuizKind{trainer.QuizRankings, trainer.QuizOuts,
+		trainer.QuizEquity, trainer.QuizSpots}
+	for _, bp := range breakpoints {
+		for _, kind := range kinds {
+			for _, level := range []int{0, trainer.MaxLevel - 1} {
+				tr := testTrainerScreen(t, bp.w, bp.h)
+				tr.prof.DrillStats[kind.String()] = profile.SkillStat{Level: level}
+				tr.begin(kind)
+				for tr.state != trainerSummary {
+					view := stripANSI(tr.View())
+					if m := bareCardCode.FindString(view); m != "" {
+						t.Fatalf("%s L%d %dx%d: frame shows bare card code %q:\n%s",
+							kind, level+1, bp.w, bp.h, m, view)
+					}
+					if got := lipgloss.Height(view); got != bp.h {
+						t.Fatalf("%s L%d %dx%d: view height %d", kind, level+1, bp.w, bp.h, got)
+					}
+					for i, line := range strings.Split(view, "\n") {
+						if w := lipgloss.Width(line); w > bp.w {
+							t.Fatalf("%s L%d %dx%d: line %d is %d cells wide",
+								kind, level+1, bp.w, bp.h, i, w)
+						}
+					}
+					if kind == trainer.QuizRankings && tr.state == trainerAsking {
+						if !strings.Contains(view, "Left") || !strings.Contains(view, "Right") {
+							t.Fatalf("%s %dx%d: rankings question must label whose hand is whose:\n%s",
+								kind, bp.w, bp.h, view)
+						}
+					}
+					if tr.state == trainerAsking {
+						answerCorrectly(t, tr)
+					} else {
+						tr.handleAction(ActContinue)
+					}
+				}
+			}
+		}
+	}
+}
+
 // TestTrainerFlow: a full session through the screen's own action path
 // lands on the summary, and "again" starts a fresh session of the same
 // kind.
