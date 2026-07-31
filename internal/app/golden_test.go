@@ -135,6 +135,15 @@ func TestGoldenTableHelp(t *testing.T) {
 	assertGolden(t, "table_help_80x24", normalizeView(m.View()))
 }
 
+// TestGoldenTableDossier pins the seat dossier overlay (the o key): the
+// archetype's claim — label, read, blurb, adjustment — over the seat's
+// observed session numbers, floating on the frozen between-hands table.
+func TestGoldenTableDossier(t *testing.T) {
+	m := buildTable(t, scenarioShowdown(), 80, 24)
+	m.Update(key("o"))
+	assertGolden(t, "table_dossier_80x24", normalizeView(m.View()))
+}
+
 // TestGoldenTableASCII forces the ASCII glyph set: every Unicode glyph has
 // a same-width substitute, so the frame's geometry must be identical to the
 // Unicode golden — only the glyphs differ.

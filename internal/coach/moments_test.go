@@ -1,6 +1,7 @@
 package coach
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/BrandonDedolph/texas-holdem/internal/ai"
@@ -8,15 +9,23 @@ import (
 	"github.com/BrandonDedolph/texas-holdem/internal/profile"
 )
 
-// TestMomentRegistryComplete pins the §5.4 registry: all fourteen IDs
-// exist exactly once, decision-time moments have triggers, review-scoped
-// moments (which need showdown information) do not, and every body
-// renders without a live view.
+// TestMomentRegistryComplete pins the §5.4 registry: all nineteen IDs
+// exist exactly once, decision-time moments have triggers, externally
+// fired moments (review-scoped ones need showdown information, the
+// archetype-read ones need the table's seat-to-archetype map) do not, and
+// every body renders without a live view.
 func TestMomentRegistryComplete(t *testing.T) {
-	reviewScoped := map[string]bool{
+	// Moments with nil triggers, fired through FireMoment from outside the
+	// decision loop.
+	externallyFired := map[string]bool{
 		"first_kicker_showdown": true,
 		"first_dominated":       true,
 		"first_split_pot":       true,
+		"read_tight":            true,
+		"read_solid":            true,
+		"read_loose":            true,
+		"read_sticky":           true,
+		"read_wild":             true,
 	}
 	want := []string{
 		"first_flush_draw", "first_oesd", "first_gutshot",
@@ -24,6 +33,7 @@ func TestMomentRegistryComplete(t *testing.T) {
 		"first_facing_3bet", "first_kicker_showdown", "first_dominated",
 		"first_station_bluff_warning", "first_pot_committed",
 		"first_counterfeit", "first_split_pot", "first_semibluff",
+		"read_tight", "read_solid", "read_loose", "read_sticky", "read_wild",
 	}
 	byID := map[string]*Moment{}
 	for _, m := range Moments() {
@@ -41,11 +51,40 @@ func TestMomentRegistryComplete(t *testing.T) {
 			t.Errorf("moment %q missing", id)
 			continue
 		}
-		if reviewScoped[id] != (m.Trigger == nil) {
-			t.Errorf("moment %q trigger presence wrong (review-scoped=%v)", id, reviewScoped[id])
+		if externallyFired[id] != (m.Trigger == nil) {
+			t.Errorf("moment %q trigger presence wrong (externally-fired=%v)", id, externallyFired[id])
 		}
 		if m.Title == "" || m.Body == nil || m.Body(nil, Advice{}) == "" {
 			t.Errorf("moment %q has no renderable body", id)
+		}
+	}
+}
+
+// TestEveryArchetypeReadHasAMoment is the generality gate on the read
+// moments: every seatable archetype's one-word read must have a
+// "read_<word>" moment whose body actually explains that word. A sixth
+// archetype cannot put a new word on a seat plate without failing here
+// until its first-encounter explanation exists.
+func TestEveryArchetypeReadHasAMoment(t *testing.T) {
+	byID := map[string]*Moment{}
+	for _, m := range Moments() {
+		byID[m.ID] = m
+	}
+	for key, p := range ai.Archetypes {
+		if key == "coach" {
+			continue // an advisor, not a seatable opponent
+		}
+		id := "read_" + p.Read
+		m := byID[id]
+		if m == nil {
+			t.Errorf("archetype %q read %q has no moment %q", key, p.Read, id)
+			continue
+		}
+		if m.Trigger != nil {
+			t.Errorf("moment %q must have a nil trigger (the table fires it)", id)
+		}
+		if body := m.Body(nil, Advice{}); !strings.Contains(body, "\""+p.Read+"\"") {
+			t.Errorf("moment %q body must explain the word %q:\n%s", id, p.Read, body)
 		}
 	}
 }

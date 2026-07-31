@@ -166,6 +166,7 @@ func TestQuickReferenceLayoutStable(t *testing.T) {
 				"positions tab": func() { q.handleAction(ActTab2) },
 				"pot odds tab":  func() { q.handleAction(ActTab3) },
 				"glossary tab":  func() { q.handleAction(ActTab4) },
+				"reads tab":     func() { q.handleAction(ActTab5) },
 				"cycle right":   func() { q.handleAction(ActRight) }, // wraps to rankings
 				"cycle left":    func() { q.handleAction(ActLeft) },  // back to glossary
 				"rankings tab":  func() { q.handleAction(ActTab1) },

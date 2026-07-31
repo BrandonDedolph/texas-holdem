@@ -88,6 +88,19 @@ func (o checkCallOpponent) Act(v *engine.PlayerView) engine.Action {
 	return engine.Fold{S: v.Seat}
 }
 
+// seatStats are one seat's observed session frequencies, accumulated from
+// the engine's event log (observeAction) as hands complete. They are what
+// the dossier shows under the archetype's read: the word is a claim, these
+// numbers are the evidence — the method lesson 12 teaches, and it stays
+// honest even for a seat whose style nobody labelled.
+type seatStats struct {
+	Hands int // completed hands the seat was dealt into
+	VPIP  int // hands it voluntarily put money in preflop (call/bet/raise)
+	PFR   int // hands it raised preflop
+	Aggro int // postflop bets + raises (individual actions)
+	Calls int // postflop calls (individual actions)
+}
+
 // villainNames are the villains' table names by seat (1..5), matching the
 // design mockups. Stable names make table reads transferable between hands:
 // "Nia is the aggressive one" only works if Nia stays Nia.
@@ -129,8 +142,20 @@ type TableScreen struct {
 
 	// reads are the villains' one-word archetype tells ("tight", "wild"),
 	// engraved on their seat plates. Derived once from the lineup: stable
-	// reads are what make table reads transferable between hands.
-	reads [engine.MaxSeats]string
+	// reads are what make table reads transferable between hands. archKeys
+	// keeps the archetype key behind each read, for the seat dossier and
+	// the archetype-read moments.
+	reads    [engine.MaxSeats]string
+	archKeys [engine.MaxSeats]string
+
+	// stats are the per-seat observed frequencies behind the dossier (the
+	// o key): derived from the engine's event log as hands play out — the
+	// table watches what a seat DOES, never what its archetype dials say.
+	// Session-scoped, like the scoreboard. handVPIP/handPFR hold the
+	// current hand's pending preflop flags, committed per dealt-in seat
+	// when the hand completes (VPIP and PFR are per-hand facts).
+	stats             [engine.MaxSeats]seatStats
+	handVPIP, handPFR [engine.MaxSeats]bool
 
 	bar       *ActionBar
 	coachMode CoachMode
@@ -256,6 +281,7 @@ func newTableScreen(cfg TableConfig, prefs *Prefs, prof *profile.Profile, stacks
 		}
 		if p, ok := ai.Archetype(key); ok {
 			m.reads[s] = p.Read
+			m.archKeys[s] = p.Key
 		}
 	}
 	if stacks[heroSeat] > 0 {
@@ -319,6 +345,7 @@ func (m *TableScreen) startHand() tea.Cmd {
 	m.boardShown, m.boardQueued = 0, 0
 	m.lastAction = [engine.MaxSeats]string{}
 	m.heroLine, m.heroGraded = "", false
+	m.handVPIP, m.handPFR = [engine.MaxSeats]bool{}, [engine.MaxSeats]bool{}
 	m.revealed = [engine.MaxSeats]bool{}
 	m.winners = 0
 	m.awardText = ""
@@ -355,6 +382,7 @@ func (m *TableScreen) ingestEvents() {
 	for _, e := range evs[m.eventsSeen:] {
 		switch e.Kind {
 		case engine.EvAction:
+			m.observeAction(e)
 			label := m.actionLabel(e)
 			m.lastAction[e.Seat] = label
 			m.pushRecent(m.seatName(e.Seat) + " " + label)
@@ -386,6 +414,30 @@ func (m *TableScreen) ingestEvents() {
 		m.completeQueued = true
 		m.queueAwards()
 		m.queue = append(m.queue, step{kind: stepDone})
+	}
+}
+
+// observeAction feeds one action event into the per-seat observed stats.
+// Blinds are engine events, not actions, so posted money can never count
+// as voluntary here — which is exactly the VPIP definition. Preflop flags
+// are per-hand (committed in finishHand); postflop aggression and calls
+// count individual actions, the inputs of the aggression factor.
+func (m *TableScreen) observeAction(e engine.Event) {
+	if e.Street == engine.Preflop {
+		switch e.Action {
+		case engine.ActionCall, engine.ActionBet, engine.ActionRaise:
+			m.handVPIP[e.Seat] = true
+			if e.Action != engine.ActionCall {
+				m.handPFR[e.Seat] = true
+			}
+		}
+		return
+	}
+	switch e.Action {
+	case engine.ActionBet, engine.ActionRaise:
+		m.stats[e.Seat].Aggro++
+	case engine.ActionCall:
+		m.stats[e.Seat].Calls++
 	}
 }
 
@@ -562,6 +614,22 @@ func (m *TableScreen) applyStep(st step) {
 // state. The completed Hand object stays around for rendering and review.
 func (m *TableScreen) finishHand() {
 	if m.hand != nil && m.hand.Phase() == engine.PhaseComplete {
+		// Commit the hand's observed preflop flags into the session stats:
+		// VPIP and PFR are per-hand facts, and their denominator is hands
+		// dealt into, so both land exactly once, at the hand boundary.
+		for s := engine.Seat(0); s.Valid(); s++ {
+			if !m.hand.DealtIn().Has(s) {
+				continue
+			}
+			st := &m.stats[s]
+			st.Hands++
+			if m.handVPIP[s] {
+				st.VPIP++
+			}
+			if m.handPFR[s] {
+				st.PFR++
+			}
+		}
 		if res, ok := m.hand.Result(); ok {
 			m.sessionNet += res.Net[heroSeat]
 		}
@@ -674,9 +742,80 @@ func (m *TableScreen) armBar() {
 		if m.coachMode != CoachOff {
 			if mo := m.coach.PendingMoment(view, adv); mo != nil {
 				m.overlay = momentOverlay(mo, view, adv)
+			} else {
+				// The archetype-read moments ("what does sticky mean?")
+				// are detected here, not in registry triggers: knowing
+				// WHICH seat is the station takes the seat-to-archetype
+				// map, which only the table has. Same guarantees as
+				// PendingMoment: hero's turn only, at most one moment per
+				// decision (candidates run only when no registry moment
+				// fired), fire-once persisted through FireMoment.
+				for _, id := range m.readMomentCandidates() {
+					if mo := m.coach.FireMoment(id); mo != nil {
+						m.overlay = momentOverlay(mo, view, adv)
+						break
+					}
+				}
 			}
 		}
 	}
+}
+
+// readMomentCandidates lists the archetype-read moments whose
+// characteristic behaviour is visible from the hero's seat right now,
+// most expensive misread first. Detection is observational — it reads the
+// hand's event log, never the opponent's dials — so each popup lands when
+// the learner can see the behaviour it names on the table, not in the
+// first orbit.
+func (m *TableScreen) readMomentCandidates() []string {
+	if m.hand == nil {
+		return nil
+	}
+	// Per-seat behaviour facts accumulated from this hand's events.
+	var aggressed, bigAggro, bigCall [engine.MaxSeats]bool
+	for _, e := range m.hand.Events() {
+		if e.Kind != engine.EvAction {
+			continue
+		}
+		switch e.Action {
+		case engine.ActionBet, engine.ActionRaise:
+			aggressed[e.Seat] = true
+			if e.Amount >= 4*m.cfg.BigBlind {
+				bigAggro[e.Seat] = true
+			}
+		case engine.ActionCall:
+			// A big call-down: Amount is the caller's street total and
+			// PotAfter the pot it closed, so Amount*4 >= PotAfter means
+			// they paid off at least a half-pot bet.
+			if e.Street != engine.Preflop && e.Amount*4 >= e.PotAfter {
+				bigCall[e.Seat] = true
+			}
+		}
+	}
+	// The raise-meaning reads teach only while the hero is actually facing
+	// the raiser's aggression — that is when the word changes the decision.
+	facingRaise := func(s engine.Seat) bool {
+		return m.hand.ToCall(heroSeat) > 0 && aggressed[s] && m.hand.Live().Has(s)
+	}
+	checks := []struct {
+		key     string
+		visible func(engine.Seat) bool
+	}{
+		{"station", func(s engine.Seat) bool { return bigCall[s] }},
+		{"maniac", func(s engine.Seat) bool { return bigAggro[s] }},
+		{"nit", facingRaise},
+		{"lag", facingRaise},
+		{"tag", facingRaise},
+	}
+	var out []string
+	for _, c := range checks {
+		for s := engine.Seat(1); s.Valid(); s++ {
+			if m.archKeys[s] == c.key && m.reads[s] != "" && c.visible(s) {
+				out = append(out, "read_"+m.reads[s])
+			}
+		}
+	}
+	return out
 }
 
 // choicesSummary spells the currently visible choices out for the status
@@ -732,6 +871,20 @@ func (m *TableScreen) villainOddsText() string {
 		equity.OddsToOne(call, potAfter) + " (needs " + engine.Chips(pct).String() + "%)"
 }
 
+// nextDossierSeat is the next occupied villain seat clockwise from the
+// given one, wrapping; engine.NoSeat when no villain is seated. The hero
+// is skipped — the dossier is a tool for reading OTHER people.
+func (m *TableScreen) nextDossierSeat(after engine.Seat) engine.Seat {
+	for i := 1; i <= engine.MaxSeats; i++ {
+		s := engine.Seat((int(after) + i) % engine.MaxSeats)
+		if s == heroSeat || m.eng.Status(s) == engine.SeatEmpty {
+			continue
+		}
+		return s
+	}
+	return engine.NoSeat
+}
+
 // seatName is the display name for a seat.
 func (m *TableScreen) seatName(s engine.Seat) string {
 	if s == heroSeat {
@@ -764,9 +917,17 @@ func (m *TableScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		if m.overlay != nil {
-			// Any key dismisses the modal card; the key is consumed, not
-			// forwarded — the table underneath was frozen, not listening
-			// (the help overlay's protocol).
+			// On an open dossier, o walks to the next opponent — reading
+			// the table seat by seat is the point of the panel. Any other
+			// key (and any key on the other overlays) dismisses; the key
+			// is consumed, not forwarded — the table underneath was
+			// frozen, not listening (the help overlay's protocol).
+			if m.overlay.dossier && msg.String() == "o" {
+				if next := m.nextDossierSeat(m.overlay.seat); next != engine.NoSeat {
+					m.overlay = m.dossierOverlay(next)
+				}
+				return m, nil
+			}
 			m.overlay = nil
 			return m, nil
 		}
@@ -841,6 +1002,17 @@ func (m *TableScreen) handleAction(a KeyAction) (tea.Cmd, bool) {
 		if m.handDone {
 			return NavigateWithData(ScreenHandReview,
 				ReviewRequest{ReturnTo: ScreenTable}), true
+		}
+		return nil, true
+
+	case ActDossier:
+		// The seat dossier: the archetype's claim over the seat's observed
+		// numbers. Opens on the first villain clockwise; o again cycles
+		// (handled by the overlay branch in Update). Available in every
+		// non-sizing state — reading opponents is exactly what the wait
+		// between turns is for.
+		if s := m.nextDossierSeat(heroSeat); s != engine.NoSeat {
+			m.overlay = m.dossierOverlay(s)
 		}
 		return nil, true
 

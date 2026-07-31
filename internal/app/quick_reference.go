@@ -3,6 +3,7 @@ package app
 import (
 	"strings"
 
+	"github.com/BrandonDedolph/texas-holdem/internal/ai"
 	"github.com/BrandonDedolph/texas-holdem/internal/engine"
 	"github.com/BrandonDedolph/texas-holdem/internal/tutorial"
 	"github.com/BrandonDedolph/texas-holdem/internal/ui/components"
@@ -15,12 +16,14 @@ import (
 type refTab int
 
 // Quick-reference tabs. The order is the learning order: what beats what,
-// where you sit, what a call must earn, then the words people use.
+// where you sit, what a call must earn, the words people use, then the
+// people across the table.
 const (
 	tabRankings refTab = iota
 	tabPositions
 	tabPotOdds
 	tabGlossary
+	tabReads
 	tabCount // sentinel
 )
 
@@ -34,6 +37,8 @@ func (t refTab) String() string {
 		return "Pot Odds"
 	case tabGlossary:
 		return "Glossary"
+	case tabReads:
+		return "Reads"
 	default:
 		return "?"
 	}
@@ -99,6 +104,9 @@ func (q *QuickReference) handleAction(a KeyAction) (tea.Cmd, bool) {
 	case ActTab4:
 		q.setTab(tabGlossary)
 		return nil, true
+	case ActTab5:
+		q.setTab(tabReads)
+		return nil, true
 	case ActUp:
 		if q.scroll > 0 {
 			q.scroll--
@@ -141,6 +149,8 @@ func (q *QuickReference) View() string {
 		panel = q.renderPotOdds()
 	case tabGlossary:
 		panel = q.renderGlossary()
+	case tabReads:
+		panel = q.renderReads()
 	}
 	// Scrolling: the content budget is h-4 (the shell), minus the tab bar
 	// and its blank line. A panel taller than that scrolls; maxScroll is
@@ -164,7 +174,7 @@ func (q *QuickReference) View() string {
 		"\n\n" + panel
 
 	dot := " " + theme.G.Dot + " "
-	footer := "left/right tabs" + dot + "1-4 jump" + dot + "esc back"
+	footer := "left/right tabs" + dot + "1-5 jump" + dot + "esc back"
 	if q.maxScroll > 0 {
 		// The scroll keys displace the jump hint: the legend must fit the
 		// 60-column compact floor, and the help overlay still documents 1-4.
@@ -211,6 +221,8 @@ func (q *QuickReference) tabSummary() string {
 		return "Compare the price of a call with your chance to win"
 	case tabGlossary:
 		return "The words every table conversation assumes"
+	case tabReads:
+		return "The one-word reads on the seat plates, decoded"
 	default:
 		return ""
 	}
@@ -370,4 +382,60 @@ func (q *QuickReference) renderGlossary() string {
 		}
 	}
 	return b.String()
+}
+
+// opponentNote decodes one seat-plate read: what the word claims about the
+// player, and the adjustment the claim calls for. Keyed by archetype key.
+// TestReadsTabCoversEveryArchetype holds this map and the rendered tab to
+// the ai registry, so a new archetype cannot reach a seat plate without
+// being documented here — the exact gap this tab exists to close ("what
+// does sticky mean?" should never need to be asked out loud again).
+type opponentNote struct {
+	meaning, adjust string
+}
+
+// The adjust lines stay under 40 cells: the dossier prints each after a
+// 10-cell label inside an overlay whose interior floors at 50 cells on a
+// 60-column terminal, and a clipped exploit teaches half a lesson.
+var opponentNotes = map[string]opponentNote{
+	"nit":     {"plays very few hands; a raise means a monster", "fold good hands to a raise; steal blinds"},
+	"tag":     {"disciplined and positionally aware; the baseline", "your model game; respect their bets"},
+	"lag":     {"raises a lot of hands, so each raise means less", "call down lighter; do not get run over"},
+	"station": {"calls with almost anything and hates folding", "never bluff; value-bet thinner, bigger"},
+	"maniac":  {"raises constantly and huge, cards optional", "tighten up; let them hang themselves"},
+}
+
+// renderReads decodes the one-word seat-plate reads: the word, the player
+// it names, and the adjustment it calls for. This is the sheet to open the
+// first time a "sticky" or a "wild" beside a name means nothing to you.
+// The rows are a projection of the ai archetype registry, so the words
+// here are the words the plates engrave, by construction.
+func (q *QuickReference) renderReads() string {
+	th := theme.Current
+	const indent = 8
+	margin := strings.Repeat(" ", indent)
+
+	var out []string
+	out = append(out,
+		th.Body.Render("Each opponent's seat plate carries a one-word read"),
+		th.Body.Render("of how that player plays. The word is a claim; the"),
+		th.Body.Render("dossier (o at the table) shows the evidence."),
+		"")
+	for _, key := range ai.ArchetypeKeys {
+		p, ok := ai.Archetype(key)
+		if !ok {
+			continue
+		}
+		n := opponentNotes[key]
+		out = append(out, th.Header.Render(padRow(p.Read, indent))+th.Body.Render(p.Label))
+		for _, l := range wrapPlain(n.meaning, quickRefPanelWidth-indent) {
+			out = append(out, margin+th.Body.Render(l))
+		}
+		for _, l := range wrapPlain("adjust: "+n.adjust, quickRefPanelWidth-indent) {
+			out = append(out, margin+th.Help.Render(l))
+		}
+		out = append(out, "")
+	}
+	out = append(out, th.Help.Render("Lesson 12 (Reading Opponents) teaches these reads."))
+	return strings.Join(out, "\n")
 }
