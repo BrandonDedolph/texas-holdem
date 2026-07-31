@@ -20,11 +20,14 @@ func suitInk(t *testing.T, s engine.Suit) lipgloss.TerminalColor {
 	return SuitStyle(s).GetForeground()
 }
 
-func TestDefaultDeckModeIsFourColor(t *testing.T) {
-	// Four-color is a deliberate learning aid (flush blindness is the
-	// classic beginner leak), so it must be the out-of-the-box default.
-	if CurrentDeckMode() != FourColor {
-		t.Errorf("CurrentDeckMode() = %v, want FourColor", CurrentDeckMode())
+func TestDefaultDeckModeIsTwoColor(t *testing.T) {
+	// A real deck is red and black, and so is every casino table, book and
+	// poker client the player will meet outside this app. Four-color is a
+	// genuine aid against flush blindness, but as a default it contradicts
+	// everything else the learner will ever see - so it lives one switch
+	// away in Settings rather than out of the box.
+	if CurrentDeckMode() != TwoColor {
+		t.Errorf("CurrentDeckMode() = %v, want TwoColor", CurrentDeckMode())
 	}
 }
 

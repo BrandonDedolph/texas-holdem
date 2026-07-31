@@ -8,7 +8,11 @@ import (
 // DeckMode selects how suits are colored.
 type DeckMode int
 
-// Deck color modes. FourColor is the default: distinguishing suits fast is a
+// Deck color modes. TwoColor is the default - a real deck is red and black,
+// and so is every casino table, book and poker client the player will meet
+// elsewhere; a training aid that contradicts all of them trains the wrong
+// reflex. FourColor stays one switch away in Settings for anyone who wants
+// it: distinguishing suits fast is a
 // real beginner skill (flush blindness is the classic leak), so each suit
 // gets its own ink. TwoColor is the live-card convention: red hearts and
 // diamonds, black spades and clubs.
@@ -19,7 +23,7 @@ const (
 
 // deckMode is the active mode. Suit color is resolved through the one
 // function SuitStyle, so the Settings toggle is a single switch.
-var deckMode = FourColor
+var deckMode = TwoColor
 
 // SetDeckMode selects the active deck color mode.
 func SetDeckMode(m DeckMode) { deckMode = m }

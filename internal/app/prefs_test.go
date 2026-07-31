@@ -34,8 +34,8 @@ func TestPrefsFromDefaultsOnGarbage(t *testing.T) {
 	if got.Speed != SpeedLearn {
 		t.Errorf("Speed = %v, want SpeedLearn", got.Speed)
 	}
-	if got.Deck != theme.FourColor {
-		t.Errorf("Deck = %v, want FourColor", got.Deck)
+	if got.Deck != theme.TwoColor {
+		t.Errorf("Deck = %v, want TwoColor", got.Deck)
 	}
 	if got.Background != BackgroundAuto {
 		t.Errorf("Background = %v, want BackgroundAuto", got.Background)

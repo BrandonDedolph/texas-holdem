@@ -50,7 +50,7 @@ type Prefs struct {
 func DefaultPrefs() *Prefs {
 	return &Prefs{
 		Speed:        SpeedLearn,
-		Deck:         theme.FourColor,
+		Deck:         theme.TwoColor,
 		ASCII:        !theme.UnicodeSupported(),
 		Background:   BackgroundAuto,
 		detectedDark: lipgloss.HasDarkBackground(),
@@ -77,10 +77,10 @@ func PrefsFrom(p *profile.Profile) *Prefs {
 	default:
 		prefs.Speed = SpeedLearn
 	}
-	if d.Deck == "two-color" {
-		prefs.Deck = theme.TwoColor
-	} else {
+	if d.Deck == "four-color" {
 		prefs.Deck = theme.FourColor
+	} else {
+		prefs.Deck = theme.TwoColor
 	}
 	// ASCII is sticky only when the user turned it on; if the terminal cannot
 	// render Unicode we force it regardless of what was stored.
@@ -166,7 +166,7 @@ func NewSettings(p *profile.Profile, prefs *Prefs) *Settings {
 		{Label: "Theme", Detail: "Force dark/light if detection guesses wrong",
 			Options: []string{BackgroundAuto.String(), BackgroundDark.String(), BackgroundLight.String()},
 			Sel:     int(prefs.Background)},
-		{Label: "Deck colors", Detail: "Each suit its own color; flushes stand out",
+		{Label: "Deck colors", Detail: "Two-color like a real deck; four-color makes flushes pop",
 			Options: []string{"Four-color", "Two-color"},
 			Sel:     deckSel(prefs.Deck)},
 		{Label: "Card glyphs", Detail: "ASCII fallback for terminals without Unicode",

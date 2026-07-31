@@ -119,12 +119,13 @@ type Display struct {
 const (
 	SpeedLearn   = "learn"
 	DeckFourCol  = "four-color"
+	DeckTwoCol   = "two-color"
 	BackgroundAu = "auto"
 )
 
 // DefaultDisplay returns the first-run presentation preferences.
 func DefaultDisplay() Display {
-	return Display{Speed: SpeedLearn, Deck: DeckFourCol, Background: BackgroundAu}
+	return Display{Speed: SpeedLearn, Deck: DeckTwoCol, Background: BackgroundAu}
 }
 
 // normalize fills blank fields with their defaults, so a profile written by an
@@ -134,7 +135,7 @@ func (d *Display) normalize() {
 		d.Speed = SpeedLearn
 	}
 	if d.Deck == "" {
-		d.Deck = DeckFourCol
+		d.Deck = DeckTwoCol
 	}
 	if d.Background == "" {
 		d.Background = BackgroundAu
