@@ -27,6 +27,7 @@ const (
 	ActTab2
 	ActTab3
 	ActTab4
+	ActTab5
 
 	// Table-screen actions (docs/design-tui.md §4.2). Poker actions are
 	// KeyActions like any other: the update loop switches on these, the
@@ -56,8 +57,9 @@ const (
 	ActCoachCycle // cycle coach verbosity Full -> Mistakes -> Off
 	ActSpeedUp
 	ActSpeedDown
-	ActReview // open the hand review (between hands)
-	ActExpand // expand the coach's full explanation (docs/design-tui.md §5.1)
+	ActReview  // open the hand review (between hands)
+	ActExpand  // expand the coach's full explanation (docs/design-tui.md §5.1)
+	ActDossier // open a seat dossier: the read decoded, plus observed stats
 )
 
 // Binding ties one action to the keys that trigger it and the legend text
@@ -161,6 +163,7 @@ var (
 		Binding{ActTab2, []string{"2"}, "2", "positions"},
 		Binding{ActTab3, []string{"3"}, "3", "pot odds"},
 		Binding{ActTab4, []string{"4"}, "4", "glossary"},
+		Binding{ActTab5, []string{"5"}, "5", "opponent reads"},
 		backBinding("back to menu"),
 		bindHelp,
 	}
@@ -189,6 +192,7 @@ var (
 	// tableSharedKeys are live in every table state except sizing (where esc
 	// must mean "cancel", not "leave").
 	tableSharedKeys = KeyMap{
+		Binding{ActDossier, []string{"o"}, "o", "opponent dossier (o again cycles seats)"},
 		Binding{ActCoachCycle, []string{"tab"}, "tab", "cycle coach (Full/Mistakes/Off)"},
 		Binding{ActSpeedUp, []string{"+", "="}, "+", "speed up"},
 		Binding{ActSpeedDown, []string{"-"}, "-", "slow down"},

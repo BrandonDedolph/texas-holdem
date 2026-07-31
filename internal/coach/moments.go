@@ -215,6 +215,46 @@ var registry = []*Moment{
 			"worth money, which is why the button raising chart is the widest in the game."),
 	},
 
+	// Archetype-read moments: the one-word seat-plate reads ("tight",
+	// "sticky"), each explained once, the first time the behaviour behind
+	// the word is visible at the table — the station's big call-down, the
+	// nit's rare raise. Like the review-scoped moments below they carry no
+	// decision-time trigger, for the same structural reason: detection
+	// needs information this package does not hold (the seat-to-archetype
+	// map), so the table fires them through FireMoment when the hero's
+	// turn arms (table.go readMomentCandidates). IDs are "read_" + the
+	// Personality.Read word; a test pins one moment per archetype read.
+	{
+		ID: "read_tight", Title: "The read: \"tight\" (the nit)", Priority: 39,
+		Body: staticBody("That raise came from the tightest player at the table. \"tight\" means they " +
+			"play very few hands - when they finally raise, it is the top of the deck. " +
+			"Fold good hands without regret, and steal their blinds while they wait."),
+	},
+	{
+		ID: "read_solid", Title: "The read: \"solid\" (tight-aggressive)", Priority: 38,
+		Body: staticBody("\"solid\" marks a tight-aggressive player - the disciplined, positionally " +
+			"aware game you are learning to play. Their raises mean what they say: " +
+			"respect them, and pick your fights with the looser seats instead."),
+	},
+	{
+		ID: "read_loose", Title: "The read: \"loose\" (loose-aggressive)", Priority: 37,
+		Body: staticBody("\"loose\" means this player raises far more hands than the chart allows, " +
+			"so each raise means less. Call down lighter than you would against a " +
+			"solid player - but with a real hand, not out of stubbornness."),
+	},
+	{
+		ID: "read_sticky", Title: "The read: \"sticky\" (the calling station)", Priority: 36,
+		Body: staticBody("That call-down is the read made visible. \"sticky\" means a calling " +
+			"station: they call with almost anything. A bluff only makes money when " +
+			"they can fold, so never bluff them - value-bet thinner and bigger instead."),
+	},
+	{
+		ID: "read_wild", Title: "The read: \"wild\" (the maniac)", Priority: 35,
+		Body: staticBody("\"wild\" is the maniac: constant, oversized raises, cards optional. Do not " +
+			"try to out-bluff chaos - tighten up, wait for a real hand, and let them " +
+			"pay you off."),
+	},
+
 	// Review-scoped moments: these detect on showdown cards or results —
 	// information the hero does not have at decision time — so they have
 	// no decision-time trigger and are fired by the review layer.
